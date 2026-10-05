@@ -1,14 +1,16 @@
 import { Box, Text } from "ink";
 import { formatCents } from "../core/money.ts";
-import type { AlertResult } from "../core/alerts.ts";
+import { milestoneFloor } from "../core/alerts.ts";
 import type { Settings } from "../db/store.ts";
+import type { Banner } from "../service.ts";
+import { VERSION } from "../version.ts";
 import { ProgressBar } from "./components/ProgressBar.tsx";
 
 type Props = {
   totalCents: number;
   lastAlertedCents: number;
   settings: Settings;
-  banner: { alert: AlertResult; totalCents: number } | null;
+  banner: Banner | null;
   notice: string | null;
   unknownModels: string[];
   pricesError: string | null;
@@ -17,8 +19,8 @@ type Props = {
 
 export function Dashboard({ totalCents, lastAlertedCents, settings, banner, notice, unknownModels, pricesError, pricesFile }: Props) {
   const { intervalCents, enabled } = settings;
-  const nextCents = (Math.floor(totalCents / intervalCents) + 1) * intervalCents;
-  const base = nextCents - intervalCents;
+  const base = milestoneFloor(totalCents, intervalCents);
+  const nextCents = base + intervalCents;
   const ratio = (totalCents - base) / intervalCents;
   const milestonesToday = Math.floor(lastAlertedCents / intervalCents);
 
@@ -27,7 +29,7 @@ export function Dashboard({ totalCents, lastAlertedCents, settings, banner, noti
       <Box flexDirection="column" borderStyle="round" paddingX={2} paddingY={1} width={56}>
         <Box justifyContent="space-between">
           <Text bold>BeAware</Text>
-          <Text dimColor>v0.1.0</Text>
+          <Text dimColor>v{VERSION}</Text>
         </Box>
         <Box marginTop={1} flexDirection="column">
           <Text dimColor>TODAY · est.</Text>

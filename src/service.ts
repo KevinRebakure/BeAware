@@ -1,12 +1,15 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { evaluate, type AlertResult } from "./core/alerts.ts";
+import { evaluate, milestoneFloor, type AlertResult } from "./core/alerts.ts";
 import { costMicros, DEFAULT_PRICES, priceFor, validatePrices, type PriceTable } from "./core/pricing.ts";
 import { pricesPath } from "./db/paths.ts";
 import { Store, type Settings } from "./db/store.ts";
 import { syncClaude } from "./ingest/claude.ts";
 
 export type CheckResult = { totalCents: number; alert: AlertResult | null };
+
+/** An alert awaiting dismissal in the TUI. */
+export type Banner = { alert: AlertResult; totalCents: number };
 
 /**
  * Compare today's total with the alert baseline and report newly crossed milestones.
@@ -34,7 +37,7 @@ export function addSpend(store: Store, cents: number): CheckResult {
 /** Move today's baseline to the current milestone without alerting. */
 function rebaseline(store: Store) {
   const interval = store.getSettings().intervalCents;
-  store.setLastAlerted(Math.floor(store.total() / interval) * interval);
+  store.setLastAlerted(milestoneFloor(store.total(), interval));
 }
 
 /** Remove manually added spend and silently move today's baseline to the new total. */
@@ -75,8 +78,8 @@ function loadPrices(file: string): PriceTable {
   let parsed: unknown;
   try {
     parsed = JSON.parse(readFileSync(file, "utf8"));
-  } catch (e) {
-    throw new Error(`prices.json is not valid JSON`);
+  } catch {
+    throw new Error("prices.json is not valid JSON");
   }
   const v = validatePrices(parsed);
   if ("error" in v) throw new Error(v.error);

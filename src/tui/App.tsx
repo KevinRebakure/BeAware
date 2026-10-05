@@ -2,10 +2,10 @@ import { useApp, useInput } from "ink";
 import { useEffect, useState } from "react";
 import type { AlertResult } from "../core/alerts.ts";
 import { formatCents } from "../core/money.ts";
-import type { Settings as S, Store } from "../db/store.ts";
+import type { Store } from "../db/store.ts";
 import { pricesPath } from "../db/paths.ts";
 import { notifyAlert } from "../notify.ts";
-import { addSpend, clearManualSpend, updateSettings, type SyncResult } from "../service.ts";
+import { addSpend, clearManualSpend, updateSettings, type Banner, type SyncResult } from "../service.ts";
 import { AddSpend } from "./AddSpend.tsx";
 import { Dashboard } from "./Dashboard.tsx";
 import { Settings } from "./Settings.tsx";
@@ -16,7 +16,7 @@ export function App({ store, sync }: { store: Store; sync: () => SyncResult }) {
   const { exit } = useApp();
   const [screen, setScreen] = useState<Screen>("dashboard");
   const [, setTick] = useState(0);
-  const [banner, setBanner] = useState<{ alert: AlertResult; totalCents: number } | null>(null);
+  const [banner, setBanner] = useState<Banner | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [warn, setWarn] = useState<{ unknownModels: string[]; pricesError: string | null }>({
     unknownModels: [],
@@ -76,7 +76,7 @@ export function App({ store, sync }: { store: Store; sync: () => SyncResult }) {
     return (
       <Settings
         settings={store.getSettings()}
-        onChange={(s: S) => {
+        onChange={(s) => {
           const reset = updateSettings(store, s);
           refresh();
           return reset;

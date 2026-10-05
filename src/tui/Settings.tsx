@@ -2,13 +2,13 @@ import { Box, Text, useInput } from "ink";
 import TextInput from "ink-text-input";
 import { useState } from "react";
 import { formatHour, parseHour } from "../core/day.ts";
-import { formatCents, parseCents } from "../core/money.ts";
-import type { Settings as S } from "../db/store.ts";
+import { formatCents, parsePositiveCents } from "../core/money.ts";
+import type { Settings as StoreSettings } from "../db/store.ts";
 
 type Props = {
-  settings: S;
+  settings: StoreSettings;
   /** Returns true when today's alert baseline was reset by the change. */
-  onChange: (s: S) => boolean;
+  onChange: (s: StoreSettings) => boolean;
   onResetManual: () => void;
   onBack: () => void;
 };
@@ -24,7 +24,7 @@ export function Settings({ settings, onChange, onResetManual, onBack }: Props) {
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
 
-  const apply = (s: S) => setNote(onChange(s) ? BASELINE_NOTE : "");
+  const apply = (s: StoreSettings) => setNote(onChange(s) ? BASELINE_NOTE : "");
 
   useInput((input, key) => {
     if (mode === "edit") {
@@ -59,8 +59,8 @@ export function Settings({ settings, onChange, onResetManual, onBack }: Props) {
 
   const submit = (v: string) => {
     if (cursor === 1) {
-      const cents = parseCents(v);
-      if (cents === null || cents === 0) return setError("Enter an amount like 25");
+      const cents = parsePositiveCents(v);
+      if (cents === null) return setError("Enter an amount like 25");
       apply({ ...settings, intervalCents: cents });
     } else {
       const hour = parseHour(v);

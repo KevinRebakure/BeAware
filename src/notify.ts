@@ -34,10 +34,11 @@ export function notifyAlert(
   spawn: Spawn = Bun.spawn as Spawn,
   platform: string = process.platform,
 ) {
+  const { title, body } = alertText(alert, totalCents);
+  const cmd = notificationCommand(platform, title, body);
+  if (!cmd) return;
   try {
-    const { title, body } = alertText(alert, totalCents);
-    const cmd = notificationCommand(platform, title, body);
-    if (cmd) spawn(cmd, { stdout: "ignore", stderr: "ignore" });
+    spawn(cmd, { stdout: "ignore", stderr: "ignore" });
   } catch {
     // ignore
   }

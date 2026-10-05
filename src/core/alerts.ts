@@ -13,8 +13,13 @@ export type AlertResult = {
   nextCents: number;
 };
 
+/** Highest milestone at or below `totalCents` (0 if none). The one place the milestone grid is defined. */
+export function milestoneFloor(totalCents: number, intervalCents: number): number {
+  return Math.floor(totalCents / intervalCents) * intervalCents;
+}
+
 export function evaluate({ totalCents, intervalCents, lastAlertedCents }: AlertInput): AlertResult {
-  const reachedCents = Math.floor(totalCents / intervalCents) * intervalCents;
+  const reachedCents = milestoneFloor(totalCents, intervalCents);
   const crossed = Math.max(0, Math.round((reachedCents - lastAlertedCents) / intervalCents));
   return { crossed, reachedCents, nextCents: reachedCents + intervalCents };
 }

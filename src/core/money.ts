@@ -8,6 +8,12 @@ export function parseCents(input: string): number | null {
   return Number.isSafeInteger(cents) ? cents : null;
 }
 
+/** Like parseCents, but also rejects zero. */
+export function parsePositiveCents(input: string): number | null {
+  const cents = parseCents(input);
+  return cents === 0 ? null : cents;
+}
+
 export function formatCents(cents: number): string {
   const dollars = Math.floor(cents / 100);
   const rest = String(cents % 100).padStart(2, "0");

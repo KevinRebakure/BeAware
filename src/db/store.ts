@@ -12,10 +12,12 @@ export const DEFAULT_SETTINGS: Settings = { enabled: true, intervalCents: 2500, 
 /** Amounts are stored as integer micro-dollars (1 cent = 10_000) because token costs are fractions of a cent. */
 const MICROS_PER_CENT = 10_000;
 
-type ClaudeRow = { id: number; model: string; usage: Usage; amountMicros: number };
+type ClaudeRow = Usage & { id: number; model: string; amountMicros: number };
 
 export class Store {
   private db: Database;
+  /** This Store is the only writer of settings, so reads are served from memory after the first. */
+  private settings: Settings | null = null;
 
   constructor(
     path: string = dbPath(),
@@ -107,7 +109,7 @@ export class Store {
            cache_read_tokens AS cacheRead, cache_5m_tokens AS cache5m, cache_1h_tokens AS cache1h
          FROM spend_events WHERE source = 'claude-code'`,
       )
-      .all() as (ClaudeRow["usage"] & { id: number; model: string; amountMicros: number })[];
+      .all() as ClaudeRow[];
     const update = this.db.query("UPDATE spend_events SET amount_micros = ? WHERE id = ?");
     let changed = false;
     this.tx(() => {
@@ -170,6 +172,10 @@ export class Store {
   }
 
   getSettings(): Settings {
+    return (this.settings ??= this.loadSettings());
+  }
+
+  private loadSettings(): Settings {
     const rows = this.db.query("SELECT key, value FROM settings").all() as { key: string; value: string }[];
     const m = Object.fromEntries(rows.map((r) => [r.key, r.value]));
     return {
@@ -183,5 +189,6 @@ export class Store {
     this.setMeta("alert_enabled", s.enabled ? "1" : "0");
     this.setMeta("alert_interval_cents", String(s.intervalCents));
     this.setMeta("day_start_hour", String(s.dayStartHour));
+    this.settings = { ...s };
   }
 }

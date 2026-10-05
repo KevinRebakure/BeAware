@@ -1,19 +1,13 @@
 import { afterEach, expect, test } from "bun:test";
-import { appendFileSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { appendFileSync, mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DEFAULT_PRICES } from "../src/core/pricing.ts";
 import { Store } from "../src/db/store.ts";
 import { parseLine, syncClaude } from "../src/ingest/claude.ts";
 import { addSpend, clearManualSpend, createSyncer } from "../src/service.ts";
+import { cleanupTmpDirs, tmpDir } from "./helpers.ts";
 
-const dirs: string[] = [];
-const tmp = () => {
-  const d = mkdtempSync(join(tmpdir(), "beaware-ing-"));
-  dirs.push(d);
-  return d;
-};
-afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })));
+afterEach(cleanupTmpDirs);
 
 const NOW = new Date(2026, 9, 5, 12, 0); // Oct 5 12:00 local, so "today" runs from 04:00
 const iso = (h: number, d = 5) => new Date(2026, 9, d, h, 0).toISOString();
@@ -38,7 +32,7 @@ const line = (o: L) =>
   });
 
 function setup() {
-  const root = tmp();
+  const root = tmpDir("beaware-ing-");
   const proj = join(root, "projects", "p1");
   mkdirSync(proj, { recursive: true });
   const store = new Store(join(root, "t.db"), () => NOW);

@@ -3,9 +3,9 @@ import { render } from "ink";
 import { createElement } from "react";
 import { Store } from "./db/store.ts";
 import { createSyncer } from "./service.ts";
+import { VERSION } from "./version.ts";
 import { App } from "./tui/App.tsx";
 
-const VERSION = "0.1.0";
 const arg = process.argv[2];
 
 if (arg === "--version" || arg === "-v") {

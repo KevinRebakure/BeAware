@@ -1,17 +1,11 @@
 import { afterEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Store } from "../src/db/store.ts";
+import { DEFAULT_SETTINGS, Store } from "../src/db/store.ts";
 import { addSpend, updateSettings } from "../src/service.ts";
+import { cleanupTmpDirs, tmpDir } from "./helpers.ts";
 
-const dirs: string[] = [];
-const tmpDb = () => {
-  const d = mkdtempSync(join(tmpdir(), "beaware-"));
-  dirs.push(d);
-  return join(d, "t.db");
-};
-afterEach(() => dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true })));
+const tmpDb = () => join(tmpDir(), "t.db");
+afterEach(cleanupTmpDirs);
 
 test("spend and alert state survive restart; no duplicate alerts", () => {
   const path = tmpDb();
@@ -31,9 +25,9 @@ test("spend and alert state survive restart; no duplicate alerts", () => {
 
 test("disabled alerts don't fire and don't replay on re-enable", () => {
   const s = new Store(tmpDb());
-  s.saveSettings({ enabled: false, intervalCents: 2500, dayStartHour: 4 });
+  s.saveSettings({ ...DEFAULT_SETTINGS, enabled: false });
   expect(addSpend(s, 3000).alert).toBeNull();
-  s.saveSettings({ enabled: true, intervalCents: 2500, dayStartHour: 4 });
+  s.saveSettings(DEFAULT_SETTINGS);
   expect(addSpend(s, 100).alert).toBeNull();
   expect(addSpend(s, 2000).alert?.crossed).toBe(1); // crosses $50
 });
@@ -41,7 +35,7 @@ test("disabled alerts don't fire and don't replay on re-enable", () => {
 test("settings persist with defaults", () => {
   const path = tmpDb();
   let s = new Store(path);
-  expect(s.getSettings()).toEqual({ enabled: true, intervalCents: 2500, dayStartHour: 4 });
+  expect(s.getSettings()).toEqual(DEFAULT_SETTINGS);
   s.saveSettings({ enabled: false, intervalCents: 1000, dayStartHour: 4 });
   s.close();
   s = new Store(path);
