@@ -4,6 +4,7 @@ import type { AlertResult } from "../core/alerts.ts";
 import { formatCents } from "../core/money.ts";
 import type { Settings as S, Store } from "../db/store.ts";
 import { pricesPath } from "../db/paths.ts";
+import { notifyAlert } from "../notify.ts";
 import { addSpend, clearManualSpend, updateSettings, type SyncResult } from "../service.ts";
 import { AddSpend } from "./AddSpend.tsx";
 import { Dashboard } from "./Dashboard.tsx";
@@ -22,6 +23,10 @@ export function App({ store, sync }: { store: Store; sync: () => SyncResult }) {
     pricesError: null,
   });
   const refresh = () => setTick((t) => t + 1);
+  const raise = (alert: AlertResult, totalCents: number) => {
+    setBanner({ alert, totalCents });
+    notifyAlert(alert, totalCents);
+  };
 
   // Pull in new Claude Code usage now and every 10s. Totals are read from the store on every
   // render, so the redraw also picks up day rollover.
@@ -29,7 +34,7 @@ export function App({ store, sync }: { store: Store; sync: () => SyncResult }) {
     const run = () => {
       const r = sync();
       setWarn({ unknownModels: r.unknownModels, pricesError: r.pricesError });
-      if (r.alert) setBanner({ alert: r.alert, totalCents: r.totalCents });
+      if (r.alert) raise(r.alert, r.totalCents);
       refresh();
     };
     const first = setTimeout(run, 0); // let the first frame render before the initial (blocking) import
@@ -58,7 +63,8 @@ export function App({ store, sync }: { store: Store; sync: () => SyncResult }) {
         onCancel={() => setScreen("dashboard")}
         onSubmit={(cents) => {
           const r = addSpend(store, cents);
-          setBanner(r.alert ? { alert: r.alert, totalCents: r.totalCents } : null);
+          if (r.alert) raise(r.alert, r.totalCents);
+          else setBanner(null);
           setNotice(`Added ${formatCents(cents)} · today ${formatCents(r.totalCents)}`);
           setScreen("dashboard");
         }}

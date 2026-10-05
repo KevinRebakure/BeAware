@@ -16,14 +16,19 @@ bun run typecheck
 
 ## TUI keys
 
-| Key | Action                                                                                            |
-|-----|---------------------------------------------------------------------------------------------------|
-| `a` | add simulated spend                                                                               |
+| Key | Action                                                                       |
+|-----|------------------------------------------------------------------------------|
+| `a` | add simulated spend                                                          |
 | `s` | settings (enable alerts, alert interval, day start hour, reset manual spend) |
-| `r` | refresh                                                                                           |
-| `q` | quit                                                                                              |
+| `r` | refresh                                                                      |
+| `q` | quit                                                                         |
 
 Crossing several milestones in one go (e.g. $23 + $55 → $78) shows **one** combined alert.
+
+Each alert also sends an OS notification (with a sound on macOS) while the TUI is open. macOS uses the built-in
+`osascript`, so notifications appear as coming from "Script Editor"; if none show up, allow it under System Settings →
+Notifications → Script Editor. Linux needs `notify-send` (libnotify). Elsewhere, or if sending fails, only the in-TUI
+banner is shown. Notifications follow the "Alerts" setting.
 
 ## Claude Code usage
 
@@ -35,7 +40,8 @@ rates** and the total is labeled "est.".
 - Prices live in
   `~/.config/beaware/prices.json` ($ per million tokens). The file is created with defaults on first run and re-read whenever it changes; stored usage is repriced, and if that pushes today past a milestone you get the normal alert. Models missing from the file count as $
   0 and show a warning.
-- Settings → "Reset manual spend" deletes only what you added with `a` (handy for testing alerts). Usage read from the Claude Code logs is never removed.
+- Settings → "Reset manual spend" deletes only what you added with `a` (handy for testing alerts). Usage read from the
+  Claude Code logs is never removed.
 
 ## Days
 
@@ -51,5 +57,5 @@ integer cents.
 ## Limitations
 
 Claude Code only (no other agents yet), estimated cost rather than your actual bill, no fast-mode pricing, daily period
-only (configurable start hour), alerts only while the TUI is open (no OS notifications or background process), prices
+only (configurable start hour), alerts and OS notifications only while the TUI is open (no background process), prices
 edited in the file rather than the TUI, no budget.
