@@ -10,9 +10,12 @@ type Props = {
   settings: Settings;
   banner: { alert: AlertResult; totalCents: number } | null;
   notice: string | null;
+  unknownModels: string[];
+  pricesError: string | null;
+  pricesFile: string;
 };
 
-export function Dashboard({ totalCents, lastAlertedCents, settings, banner, notice }: Props) {
+export function Dashboard({ totalCents, lastAlertedCents, settings, banner, notice, unknownModels, pricesError, pricesFile }: Props) {
   const { intervalCents, enabled } = settings;
   const nextCents = (Math.floor(totalCents / intervalCents) + 1) * intervalCents;
   const base = nextCents - intervalCents;
@@ -27,7 +30,7 @@ export function Dashboard({ totalCents, lastAlertedCents, settings, banner, noti
           <Text dimColor>v0.1.0</Text>
         </Box>
         <Box marginTop={1} flexDirection="column">
-          <Text dimColor>TODAY</Text>
+          <Text dimColor>TODAY · est.</Text>
           <Text bold>{formatCents(totalCents)}</Text>
         </Box>
         <Box marginTop={1} flexDirection="column">
@@ -61,6 +64,14 @@ export function Dashboard({ totalCents, lastAlertedCents, settings, banner, noti
           </Text>
           <Text dimColor>press any key to dismiss</Text>
         </Box>
+      )}
+      {pricesError && (
+        <Text color="yellow"> ⚠ {pricesError} — using default prices ({pricesFile})</Text>
+      )}
+      {unknownModels.length > 0 && (
+        <Text color="yellow">
+          {" "}⚠ unpriced model{unknownModels.length > 1 ? "s" : ""}: {unknownModels.join(", ")} (counted as $0) — edit {pricesFile}
+        </Text>
       )}
       {notice && !banner && <Text color="green"> {notice}</Text>}
       <Text dimColor> a add spend s settings r refresh q quit</Text>

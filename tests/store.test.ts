@@ -48,14 +48,6 @@ test("settings persist with defaults", () => {
   expect(s.getSettings()).toEqual({ enabled: false, intervalCents: 1000, dayStartHour: 4 });
 });
 
-test("reset clears today's spend and alert state", () => {
-  const s = new Store(tmpDb());
-  addSpend(s, 3000);
-  s.resetDay();
-  expect(s.total()).toBe(0);
-  expect(addSpend(s, 3000).alert?.crossed).toBe(1);
-});
-
 // Local-time clock helper: month is 1-based.
 const at = (m: number, d: number, h: number) => new Date(2026, m - 1, d, h, 30);
 const clocked = (path: string, now: { t: Date }) => new Store(path, () => now.t);
@@ -96,4 +88,14 @@ test("changing the interval resets the baseline silently", () => {
 test("toggling alerts alone does not touch the baseline", () => {
   const s = new Store(tmpDb());
   expect(updateSettings(s, { ...s.getSettings(), enabled: false })).toBe(false);
+});
+
+test("reset hides spend so far and clears the baseline; later spend counts", () => {
+  const now = { t: at(10, 5, 12) };
+  const s = clocked(tmpDb(), now);
+  addSpend(s, 3000);
+  s.resetDay();
+  expect(s.total()).toBe(0);
+  now.t = at(10, 5, 13);
+  expect(addSpend(s, 3000).alert?.crossed).toBe(1);
 });

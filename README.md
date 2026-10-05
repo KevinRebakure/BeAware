@@ -25,6 +25,14 @@ bun run typecheck
 
 Crossing several milestones in one go (e.g. $23 + $55 → $78) shows **one** combined alert.
 
+## Claude Code usage
+
+While the TUI is open, BeAware reads `~/.claude/projects/**/*.jsonl` (or `$CLAUDE_CONFIG_DIR/projects`) every 10 seconds. That covers all projects and subagents. The logs hold token counts, not dollars, so cost is **estimated at API rates** and the total is labeled "est.".
+
+- The first launch imports the last 7 days and is quiet: usage that already exists never triggers an alert.
+- Prices live in `~/.config/beaware/prices.json` ($ per million tokens). The file is created with defaults on first run and re-read whenever it changes; stored usage is repriced, and if that pushes today past a milestone you get the normal alert. Models missing from the file count as $0 and show a warning.
+- "Reset today's spend" in settings hides usage up to now; it never touches the log files.
+
 ## Days
 
 A "day" runs from the configured start hour (default 04:00, set in the settings screen) to the same hour the next day,
@@ -38,4 +46,4 @@ integer cents.
 
 ## Limitations
 
-Manual spend only, daily period only (configurable start hour), in-TUI alerts only (no OS notifications), no budget.
+Claude Code only (no other agents yet), estimated cost rather than your actual bill, no fast-mode pricing, daily period only (configurable start hour), alerts only while the TUI is open (no OS notifications or background process), prices edited in the file rather than the TUI, no budget.

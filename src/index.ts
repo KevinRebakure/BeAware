@@ -2,6 +2,7 @@
 import { render } from "ink";
 import { createElement } from "react";
 import { Store } from "./db/store.ts";
+import { createSyncer } from "./service.ts";
 import { App } from "./tui/App.tsx";
 
 const VERSION = "0.1.0";
@@ -22,7 +23,7 @@ Keys:  a add spend · s settings · r refresh · q quit`);
   process.exit(1);
 } else {
   const store = new Store();
-  const app = render(createElement(App, { store }));
+  const app = render(createElement(App, { store, sync: createSyncer(store) }));
   await app.waitUntilExit();
   store.close();
 }
