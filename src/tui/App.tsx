@@ -4,7 +4,7 @@ import type { AlertResult } from "../core/alerts.ts";
 import { formatCents } from "../core/money.ts";
 import type { Settings as S, Store } from "../db/store.ts";
 import { pricesPath } from "../db/paths.ts";
-import { addSpend, updateSettings, type SyncResult } from "../service.ts";
+import { addSpend, clearManualSpend, updateSettings, type SyncResult } from "../service.ts";
 import { AddSpend } from "./AddSpend.tsx";
 import { Dashboard } from "./Dashboard.tsx";
 import { Settings } from "./Settings.tsx";
@@ -74,6 +74,10 @@ export function App({ store, sync }: { store: Store; sync: () => SyncResult }) {
           const reset = updateSettings(store, s);
           refresh();
           return reset;
+        }}
+        onClearManual={() => {
+          clearManualSpend(store);
+          refresh();
         }}
         onReset={() => {
           store.resetDay();

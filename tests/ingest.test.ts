@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { DEFAULT_PRICES } from "../src/core/pricing.ts";
 import { Store } from "../src/db/store.ts";
 import { parseLine, syncClaude } from "../src/ingest/claude.ts";
-import { createSyncer } from "../src/service.ts";
+import { addSpend, clearManualSpend, createSyncer } from "../src/service.ts";
 
 const dirs: string[] = [];
 const tmp = () => {
@@ -204,4 +204,16 @@ test("reset hides logged usage and a re-sync does not bring it back", () => {
   expect(sync().totalCents).toBe(0);
   appendFileSync(f, line({ id: "m2", req: "r2", at: iso(13), output: 500_000 }) + "\n"); // after the cutoff (12:00)
   expect(sync().totalCents).toBe(1000);
+});
+
+test("clearing manual spend keeps logged usage and re-baselines silently", () => {
+  const { proj, claudeRoot, pricesFile, store } = setup();
+  writeFileSync(join(proj, "a.jsonl"), line({ id: "m1", output: 1_000_000 }) + "\n"); // $20 real
+  const sync = createSyncer(store, { claudeRoot, pricesFile, now: NOW });
+  sync();
+  expect(addSpend(store, 3000).alert?.crossed).toBe(2); // $50 total: crosses $25 and $50
+  clearManualSpend(store);
+  expect(store.total()).toBe(2000);
+  expect(sync().alert).toBeNull();
+  expect(addSpend(store, 600).alert?.crossed).toBe(1); // $26: crosses $25 again, so alerts are retestable
 });

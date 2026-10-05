@@ -94,6 +94,11 @@ export class Store {
     this.db.query("DELETE FROM alert_state WHERE day = ?").run(day);
   }
 
+  /** Delete all manually added spend (any day). Log-derived usage is untouched. */
+  clearManual() {
+    this.db.query("DELETE FROM spend_events WHERE source = 'manual'").run();
+  }
+
   claudeModels(): string[] {
     const rows = this.db
       .query("SELECT DISTINCT model FROM spend_events WHERE source = 'claude-code' ORDER BY model")

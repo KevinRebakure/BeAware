@@ -37,6 +37,12 @@ function rebaseline(store: Store) {
   store.setLastAlerted(Math.floor(store.total() / interval) * interval);
 }
 
+/** Remove manually added spend and silently move today's baseline to the new total. */
+export function clearManualSpend(store: Store) {
+  store.clearManual();
+  rebaseline(store);
+}
+
 /**
  * Save settings. Changing the interval or the day-start hour moves the milestone grid
  * or re-buckets spend, so today's baseline is reset to the current milestone: no alert
