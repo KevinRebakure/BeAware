@@ -19,7 +19,7 @@ bun run typecheck
 | Key | Action                                                                                            |
 |-----|---------------------------------------------------------------------------------------------------|
 | `a` | add simulated spend                                                                               |
-| `s` | settings (enable alerts, alert interval, day start hour, clear manual spend, reset today's spend) |
+| `s` | settings (enable alerts, alert interval, day start hour, reset manual spend) |
 | `r` | refresh                                                                                           |
 | `q` | quit                                                                                              |
 
@@ -35,7 +35,7 @@ rates** and the total is labeled "est.".
 - Prices live in
   `~/.config/beaware/prices.json` ($ per million tokens). The file is created with defaults on first run and re-read whenever it changes; stored usage is repriced, and if that pushes today past a milestone you get the normal alert. Models missing from the file count as $
   0 and show a warning.
-- "Reset today's spend" in settings hides usage up to now; it never touches the log files.
+- Settings → "Reset manual spend" deletes only what you added with `a` (handy for testing alerts). Usage read from the Claude Code logs is never removed.
 
 ## Days
 

@@ -9,22 +9,20 @@ type Props = {
   settings: S;
   /** Returns true when today's alert baseline was reset by the change. */
   onChange: (s: S) => boolean;
-  onReset: () => void;
-  onClearManual: () => void;
+  onResetManual: () => void;
   onBack: () => void;
 };
 
 type Mode = "list" | "edit" | "confirm";
-const ITEMS = ["Alerts enabled", "Alert every", "Day starts at", "Clear manual spend", "Reset today's spend"] as const;
+const ITEMS = ["Alerts enabled", "Alert every", "Day starts at", "Reset manual spend"] as const;
 const BASELINE_NOTE = "Alert baseline reset — no alert fired for this change.";
 
-export function Settings({ settings, onChange, onReset, onClearManual, onBack }: Props) {
+export function Settings({ settings, onChange, onResetManual, onBack }: Props) {
   const [cursor, setCursor] = useState(0);
   const [mode, setMode] = useState<Mode>("list");
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [note, setNote] = useState("");
-  const [target, setTarget] = useState<"manual" | "reset">("reset");
 
   const apply = (s: S) => setNote(onChange(s) ? BASELINE_NOTE : "");
 
@@ -37,7 +35,7 @@ export function Settings({ settings, onChange, onReset, onClearManual, onBack }:
       return;
     }
     if (mode === "confirm") {
-      if (input === "y") onReset();
+      if (input === "y") onResetManual();
       setMode("list");
       return;
     }
@@ -55,10 +53,7 @@ export function Settings({ settings, onChange, onReset, onClearManual, onBack }:
         setDraft(String(settings.dayStartHour));
         setMode("edit");
       }
-      if (cursor === 3 || cursor === 4) {
-        setTarget(cursor === 3 ? "manual" : "reset");
-        setMode("confirm");
-      }
+      if (cursor === 3) setMode("confirm");
     }
   });
 
@@ -112,10 +107,7 @@ export function Settings({ settings, onChange, onReset, onClearManual, onBack }:
       </Box>
       {error && <Text color="red">{error}</Text>}
       {note && <Text color="yellow">{note}</Text>}
-      {mode === "confirm" && <Text color="yellow">
-          {"\n"}
-          {target === "manual" ? "Delete all manually added spend? Claude Code usage is kept. y/n" : "Hide all of today's spend so far? y/n"}
-        </Text>}
+      {mode === "confirm" && <Text color="yellow">{"\n"}Delete all manually added spend? Claude Code usage is kept. y/n</Text>}
       <Text dimColor>
         {"\n"}
         {mode === "edit" ? "enter save esc cancel" : "↑/↓ move enter/space change esc back"}

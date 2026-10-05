@@ -194,18 +194,6 @@ test("an invalid prices.json falls back to defaults and reports the error", () =
   expect(r.totalCents).toBe(2000);
 });
 
-test("reset hides logged usage and a re-sync does not bring it back", () => {
-  const { proj, claudeRoot, pricesFile, store } = setup();
-  const f = join(proj, "a.jsonl");
-  writeFileSync(f, line({ id: "m1", at: iso(9), output: 1_000_000 }) + "\n");
-  const sync = createSyncer(store, { claudeRoot, pricesFile, now: NOW });
-  expect(sync().totalCents).toBe(2000);
-  store.resetDay();
-  expect(sync().totalCents).toBe(0);
-  appendFileSync(f, line({ id: "m2", req: "r2", at: iso(13), output: 500_000 }) + "\n"); // after the cutoff (12:00)
-  expect(sync().totalCents).toBe(1000);
-});
-
 test("clearing manual spend keeps logged usage and re-baselines silently", () => {
   const { proj, claudeRoot, pricesFile, store } = setup();
   writeFileSync(join(proj, "a.jsonl"), line({ id: "m1", output: 1_000_000 }) + "\n"); // $20 real

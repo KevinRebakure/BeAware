@@ -89,13 +89,3 @@ test("toggling alerts alone does not touch the baseline", () => {
   const s = new Store(tmpDb());
   expect(updateSettings(s, { ...s.getSettings(), enabled: false })).toBe(false);
 });
-
-test("reset hides spend so far and clears the baseline; later spend counts", () => {
-  const now = { t: at(10, 5, 12) };
-  const s = clocked(tmpDb(), now);
-  addSpend(s, 3000);
-  s.resetDay();
-  expect(s.total()).toBe(0);
-  now.t = at(10, 5, 13);
-  expect(addSpend(s, 3000).alert?.crossed).toBe(1);
-});

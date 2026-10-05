@@ -75,12 +75,8 @@ export function App({ store, sync }: { store: Store; sync: () => SyncResult }) {
           refresh();
           return reset;
         }}
-        onClearManual={() => {
+        onResetManual={() => {
           clearManualSpend(store);
-          refresh();
-        }}
-        onReset={() => {
-          store.resetDay();
           refresh();
         }}
         onBack={() => setScreen("dashboard")}

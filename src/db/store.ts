@@ -75,23 +75,16 @@ export class Store {
       .run(ev.key, ev.model, u.input, u.output, u.cacheRead, u.cache5m, u.cache1h, amountMicros, ev.at);
   }
 
-  /** Today's total in whole cents (rounded down). Usage before a "reset" cutoff is ignored. */
+  /** Today's total in whole cents (rounded down). */
   total(day = this.currentDay()): number {
     const [start, end] = dayRange(day, this.getSettings().dayStartHour);
-    const cutoff = this.getMeta("reset_after") ?? "";
     const row = this.db
       .query(
         `SELECT COALESCE(SUM(amount_micros), 0) AS t FROM spend_events
-         WHERE created_at >= ? AND created_at < ? AND created_at > ?`,
+         WHERE created_at >= ? AND created_at < ?`,
       )
-      .get(start.toISOString(), end.toISOString(), cutoff) as { t: number };
+      .get(start.toISOString(), end.toISOString()) as { t: number };
     return Math.floor(row.t / MICROS_PER_CENT);
-  }
-
-  /** Hide everything so far today (log files are never touched) and clear the day's alert state. */
-  resetDay(day = this.currentDay()) {
-    this.setMeta("reset_after", this.clock().toISOString());
-    this.db.query("DELETE FROM alert_state WHERE day = ?").run(day);
   }
 
   /** Delete all manually added spend (any day). Log-derived usage is untouched. */
