@@ -1,0 +1,25 @@
+{
+  "name": "beaware",
+  "version": "0.1.0",
+  "description": "Local-first spending alerts for AI coding agents",
+  "type": "module",
+  "bin": {
+    "beaware": "src/index.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "start": "bun run src/index.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ink": "^8.0.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.2",
+    "@types/react": "^19.3.0",
+    "typescript": "^7.0.2"
+  }
+}
