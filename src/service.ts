@@ -8,9 +8,6 @@ import { syncClaude } from "./ingest/claude.ts";
 
 export type CheckResult = { totalCents: number; alert: AlertResult | null };
 
-/** An alert awaiting dismissal in the TUI. */
-export type Banner = { alert: AlertResult; totalCents: number };
-
 /**
  * Compare today's total with the alert baseline and report newly crossed milestones.
  * The high-water mark is advanced even when alerts are disabled, so re-enabling

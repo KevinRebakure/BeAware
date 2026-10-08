@@ -2,7 +2,8 @@ import { Box, Text } from "ink";
 import { formatCents } from "../core/money.ts";
 import { milestoneFloor } from "../core/alerts.ts";
 import type { Settings } from "../db/store.ts";
-import type { Banner } from "../service.ts";
+import type { StoredAlert } from "../db/store.ts";
+import { formatAgo } from "../core/ago.ts";
 import { VERSION } from "../version.ts";
 import { ProgressBar } from "./components/ProgressBar.tsx";
 
@@ -10,14 +11,15 @@ type Props = {
   totalCents: number;
   lastAlertedCents: number;
   settings: Settings;
-  banner: Banner | null;
+  banner: StoredAlert | null;
   notice: string | null;
   unknownModels: string[];
   pricesError: string | null;
   pricesFile: string;
+  daemon: { alive: boolean; lastSync: Date | null };
 };
 
-export function Dashboard({ totalCents, lastAlertedCents, settings, banner, notice, unknownModels, pricesError, pricesFile }: Props) {
+export function Dashboard({ totalCents, lastAlertedCents, settings, banner, notice, unknownModels, pricesError, pricesFile, daemon }: Props) {
   const { intervalCents, enabled } = settings;
   const base = milestoneFloor(totalCents, intervalCents);
   const nextCents = base + intervalCents;
@@ -50,19 +52,24 @@ export function Dashboard({ totalCents, lastAlertedCents, settings, banner, noti
             value={enabled ? "● enabled" : "○ disabled"}
             color={enabled ? "green" : "gray"}
           />
+          <Row
+            label="Daemon"
+            value={daemon.alive ? `● running · synced ${formatAgo(daemon.lastSync)}` : "○ not running"}
+            color={daemon.alive ? "green" : "red"}
+          />
           <Row label="Milestones today" value={String(milestonesToday)} />
         </Box>
       </Box>
       {banner && (
         <Box borderStyle="round" borderColor="yellow" paddingX={2} width={56} flexDirection="column">
           <Text color="yellow" bold>
-            🔔 Spending milestone{banner.alert.crossed > 1 ? "s" : ""} reached
+            🔔 Spending milestone{banner.crossed > 1 ? "s" : ""} reached
           </Text>
           <Text>
-            You crossed {banner.alert.crossed} spending alert{banner.alert.crossed > 1 ? "s" : ""}.
+            You crossed {banner.crossed} spending alert{banner.crossed > 1 ? "s" : ""}.
           </Text>
           <Text>
-            Current spend: {formatCents(banner.totalCents)} · Next alert: {formatCents(banner.alert.nextCents)}
+            Current spend: {formatCents(banner.totalCents)} · Next alert: {formatCents(banner.nextCents)}
           </Text>
           <Text dimColor>press any key to dismiss</Text>
         </Box>
@@ -75,8 +82,11 @@ export function Dashboard({ totalCents, lastAlertedCents, settings, banner, noti
           {" "}⚠ unpriced model{unknownModels.length > 1 ? "s" : ""}: {unknownModels.join(", ")} (counted as $0) — edit {pricesFile}
         </Text>
       )}
+      {!daemon.alive && (
+        <Text color="yellow"> ⚠ background daemon not running — no live syncing or alerts. Press i to install, d to restart.</Text>
+      )}
       {notice && !banner && <Text color="green"> {notice}</Text>}
-      <Text dimColor> a add spend s settings r refresh q quit</Text>
+      <Text dimColor> a add spend s settings r refresh d restart daemon i install q quit</Text>
     </Box>
   );
 }
