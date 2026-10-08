@@ -13,6 +13,7 @@ const result = (over: Partial<SyncResult> = {}): SyncResult => ({
   totalCents: 2600,
   alert: null,
   unknownModels: [],
+  pruned: 0,
   pricesError: null,
   ...over,
 });

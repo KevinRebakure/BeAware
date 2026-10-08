@@ -46,7 +46,7 @@ test("re-syncing is idempotent and only picks up new rows", () => {
 test("rows older than the window are skipped but still advance the cursor", () => {
   const { dbPath, store, sync } = setup();
   makeCliDb(dbPath, [
-    { at: new Date(2026, 8, 1, 10).toISOString(), nanoAiu: 9 * USD }, // Sep 1: outside the 7-day window
+    { at: new Date(2026, 8, 1, 10).toISOString(), nanoAiu: 9 * USD }, // Sep 1: outside the kept days
     { at: at(10), nanoAiu: 1 * USD },
   ]);
   sync();

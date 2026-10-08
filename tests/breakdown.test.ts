@@ -30,7 +30,16 @@ test("percentages sum to exactly 100 even when thirds don't divide evenly", () =
   expect(out.find((p) => p.label === "Manual")!.sources[0]!.tag).toBe("entered");
 });
 
-test("no spend, no rows; providers without spend are omitted", () => {
-  expect(summarize([])).toEqual([]);
-  expect(summarize([{ providerId: "copilot", sourceId: "copilot-cli", micros: M }]).map((p) => p.label)).toEqual(["GitHub Copilot"]);
+test("every provider is listed even with no spend; manual only once it has some", () => {
+  const none = summarize([]);
+  expect(none.map((p) => [p.label, p.cents, p.percent])).toEqual([
+    ["Claude Code", 0, 0],
+    ["GitHub Copilot", 0, 0],
+  ]);
+  const claudeOnly = summarize([{ providerId: "claude-code", sourceId: "claude-code", micros: 5 * M }]);
+  expect(claudeOnly.map((p) => [p.label, p.percent])).toEqual([
+    ["Claude Code", 100],
+    ["GitHub Copilot", 0],
+  ]);
+  expect(claudeOnly[1]!.tags).toEqual(["reported", "est."]);
 });

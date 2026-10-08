@@ -102,7 +102,7 @@ test("a file that shrinks is re-read from the start", () => {
   expect(store.total()).toBe(3000); // m1 + m3
 });
 
-test("events older than the 7-day window are not imported", () => {
+test("events before the kept days (today + 2 previous) are not imported", () => {
   const { proj, claudeRoot, store } = setup();
   writeFileSync(
     join(proj, "a.jsonl"),
@@ -111,6 +111,20 @@ test("events older than the 7-day window are not imported", () => {
   claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
   expect(store.total()).toBe(2000);
   expect(store.total("2026-09-25")).toBe(0);
+});
+
+test("the cutoff is the start of the day 2 days back: Oct 3 04:00 when today is Oct 5", () => {
+  const { proj, claudeRoot, store } = setup();
+  writeFileSync(
+    join(proj, "a.jsonl"),
+    [
+      line({ id: "before", at: new Date(2026, 9, 3, 3, 59).toISOString(), output: 1_000_000 }), // Oct 2's app day
+      line({ id: "first", req: "r2", at: new Date(2026, 9, 3, 4, 0).toISOString(), output: 1_000_000 }),
+    ].join("\n") + "\n",
+  );
+  claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
+  expect(store.total("2026-10-02")).toBe(0);
+  expect(store.total("2026-10-03")).toBe(2000);
 });
 
 test("files untouched for longer than the window are skipped, and stay skipped", () => {

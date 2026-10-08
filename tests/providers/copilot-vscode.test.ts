@@ -94,3 +94,24 @@ test("a prices.json from before Copilot support gains the Copilot defaults witho
   expect(after["claude-sonnet-5-5"]).toBeUndefined(); // Claude defaults the user removed stay removed
   expect(after["copilot/gpt-5.5"]).toBeDefined();
 });
+
+test("a replayed chat session never brings back requests that retention has dropped", () => {
+  const { vscodeRoot, store, sync } = setup(); // today is Oct 5; kept days start Oct 3
+  const path = writeChat(
+    vscodeRoot,
+    "ws1",
+    "sess1",
+    chatLog("sess1", [
+      { id: "old", at: ms(10, 2), prompt: 1_000_000, output: 0 }, // inside the old 7-day window, but before the kept days
+      { id: "kept", at: ms(10, 4), prompt: 1_000_000, output: 0 },
+    ]),
+  );
+  sync();
+  expect(store.breakdown("2026-10-02")).toEqual([]);
+  expect(store.breakdown("2026-10-04")).toHaveLength(1);
+
+  writeFileSync(path, chatLog("sess1", [{ id: "old", at: ms(10, 2), prompt: 1_000_000, output: 0 }, { id: "kept", at: ms(10, 4), prompt: 1_000_000, output: 0 }, { id: "new", at: ms(11), prompt: 1_000_000, output: 0 }]));
+  utimesSync(path, new Date(), new Date(Date.now() + 5000)); // the file changed, so it is replayed in full
+  sync();
+  expect(store.breakdown("2026-10-02")).toEqual([]);
+});
