@@ -14,6 +14,7 @@ sequenceDiagram
     Sy->>P: sync(ctx) (new data only)
     P->>St: upsertEvent, setCursor
   end
+  Sy->>St: prune() (retention: oldest days past 7 → keep last 3)
   Sy->>St: total(), settings, lastAlerted
   Sy-->>D: {total, alert?, warnings}
   alt alert
@@ -59,9 +60,18 @@ flowchart LR
 ```
 
 ## 6. First sync
-Per provider (`synced_once:<providerId>`): imports the last 7 days, sets the baseline to the current milestone, fires nothing. A provider added later (e.g. Copilot after an update) gets its own quiet first sync, so its history can't cause an alert. Side effect: an alert that would have been raised by *another* provider in that same tick is absorbed into the new baseline.
+Per provider (`synced_once:<providerId>`): imports the last 3 days (the kept days), sets the baseline to the current milestone, fires nothing. A provider added later (e.g. Copilot after an update) gets its own quiet first sync, so its history can't cause an alert. Side effect: an alert that would have been raised by *another* provider in that same tick is absorbed into the new baseline.
 
-## 7. Copilot sources
+## 7. Retention
+```mermaid
+flowchart LR
+  T["each sync"] --> Q{"oldest row's app day<br/>≥ 6 days before today?<br/>(data spans 7 days)"}
+  Q -- no --> X["nothing"]
+  Q -- yes --> D["delete events and alert_state<br/>before start of (today − 2)<br/>→ keep today + 2 previous days"]
+```
+One boundary, `keepFrom(now, dayStartHour)` in `src/db/retention.ts`, is shared by pruning and ingestion (`windowStart`). Ingesters ignore anything before it, so a re-read log or a replayed chat session can't bring a deleted row back. Pruning is calendar-based and runs in one transaction; the daemon logs a line only when rows were deleted. The two numbers are constants (`PRUNE_AT_DAYS`, `KEEP_DAYS`), not settings.
+
+## 8. Copilot sources
 ```mermaid
 flowchart LR
   subgraph cli["copilot-cli"]

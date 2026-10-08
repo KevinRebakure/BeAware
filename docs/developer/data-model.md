@@ -68,6 +68,10 @@ erDiagram
   last_alert }o--|| daemon_heartbeat : "written by same daemon tick"
 ```
 
+## Retention
+
+`Store.prune()` (called every sync) deletes `spend_events` (manual rows included) and `alert_state` rows older than the last 3 app days once the data spans 7. `ingest_cursors` is never pruned by age: dropping a cursor would make a file that still exists get re-read. It grows with the number of log files, not with usage. The deleted space is reused by SQLite, not returned to the OS (no `VACUUM`), so the file size plateaus. See [flows](flows.md#7-retention).
+
 ## Conventions
 
 - Money: integer **micro-dollars** (1¢ = 10,000); totals floor to cents

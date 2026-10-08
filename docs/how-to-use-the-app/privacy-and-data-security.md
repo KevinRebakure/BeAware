@@ -36,6 +36,16 @@ In `~/.config/beaware/beaware.db` (SQLite):
 
 The daemon log records start/stop, alerts and error messages. It never records usage payloads or conversation text.
 
+## How long data is kept
+
+BeAware only ever shows **today**, so it keeps just the last few days. Once the stored data covers 7 days (counting from
+the day start, default 04:00), everything older than the **last 3 days** (today and the 2 before it) is deleted, along with
+the per-day alert state. Usage older than that is also never imported. In practice the database holds between 3 and 7 days
+of usage rows and stays small instead of growing forever.
+
+Deleted rows are gone for good: BeAware keeps no backup. A line like `pruned 1369 events older than the last 3 days` is written
+to the daemon log whenever this happens. The progress markers (log file paths) are small and are not pruned.
+
 ## Network
 
 BeAware makes **no network requests**: no telemetry, no update checks, no calls to Anthropic or GitHub. It needs no API
@@ -56,5 +66,5 @@ rm -rf ~/Library/Logs/beaware     # daemon log
 rm ~/.local/bin/beaware           # the binary
 ```
 
-Deleting the database is safe: usage from the last 7 days is re-imported the next time the daemon starts (quietly, no alerts).
+Deleting the database is safe: usage from the last 3 days is re-imported the next time the daemon starts (quietly, no alerts).
 Your other tools' data is never changed or deleted by BeAware.

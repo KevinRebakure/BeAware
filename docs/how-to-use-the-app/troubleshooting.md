@@ -1,14 +1,14 @@
 # Troubleshooting
 
-| Symptom                            | Fix                                                         |
-|------------------------------------|-------------------------------------------------------------|
-| TUI says "daemon not running"      | press `d`, or `beaware install`                             |
-| `beaware: command not found`       | add `~/.local/bin` to `PATH`                                |
-| No notifications                   | System Settings → Notifications → **Script Editor** → allow |
-| `status` shows old "last sync"     | `beaware logs`; then `d` to restart                         |
-| Warning: unpriced model            | add it to `prices.json` (counted as $0 until then); Copilot models are keyed `copilot/<model>` |
-| Copilot spend missing              | check `~/.copilot/session-store.db` exists (or `$COPILOT_HOME`); VS Code only counts requests that finished, and only the last 7 days on first run |
-| Copilot spend looks doubled        | the same agent work can appear in both the CLI and VS Code sources; see [supported harnesses](supported-harnesses.md) |
-| `beaware logs` shows `copilot sync failed` | the Copilot data was unreadable at that moment (for example mid-write); it retries every 10s, and Claude Code is unaffected |
-| Warning: prices.json invalid       | fix the JSON; defaults used meanwhile                       |
-| `install` fails from `bun run dev` | run it from the compiled `dist/beaware`                     |
+| Symptom                                    | Fix                                                                                                                                                                                                                                            |
+|--------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| TUI says "daemon not running"              | press `d`, or `beaware install`                                                                                                                                                                                                                |
+| `beaware: command not found`               | add `~/.local/bin` to `PATH`                                                                                                                                                                                                                   |
+| No notifications                           | System Settings → Notifications → **Script Editor** → allow                                                                                                                                                                                    |
+| `status` shows old "last sync"             | `beaware logs`; then `d` to restart                                                                                                                                                                                                            |
+| Warning: unpriced model                    | add it to `prices.json` (counted as $0 until then); Copilot models are keyed `copilot/<model>`                                                                                                                                                 |
+| Copilot spend missing                      | check `~/.copilot/session-store.db` exists (or `$COPILOT_HOME`); VS Code only counts requests that finished, and usage older than the last 3 days is never imported (see [data retention](privacy-and-data-security.md#how-long-data-is-kept)) |
+| Copilot spend looks doubled                | the same agent work can appear in both the CLI and VS Code sources; see [supported harnesses](supported-harnesses.md)                                                                                                                          |
+| `beaware logs` shows `copilot sync failed` | the Copilot data was unreadable at that moment (for example mid-write); it retries every 10s, and Claude Code is unaffected                                                                                                                    |
+| Warning: prices.json invalid               | fix the JSON; defaults used meanwhile                                                                                                                                                                                                          |
+| `install` fails from `bun run dev`         | run it from the compiled `dist/beaware`                                                                                                                                                                                                        |

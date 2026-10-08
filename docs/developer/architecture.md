@@ -40,6 +40,7 @@ flowchart LR
 | `src/core/*`                    | pure logic: milestones, pricing, day buckets, money         |
 | `src/db/store.ts`               | facade: one entry point, delegates to repositories          |
 | `src/db/config.ts`              | open DB (pragmas, WAL), run migrations                      |
+| `src/db/retention.ts`           | retention constants, `keepFrom`, `shouldPrune` (pure)       |
 | `src/db/migrations/*`           | numbered, append-only schema steps (`PRAGMA user_version`)  |
 | `src/db/repositories/*`         | one file per entity; all SQL lives here                     |
 | `src/notify.ts`                 | OS notification command                                     |

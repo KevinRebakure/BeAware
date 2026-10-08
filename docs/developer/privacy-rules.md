@@ -18,6 +18,9 @@ out of BeAware. They apply to every provider under `src/providers/`; read them b
    branch names in them. (Paths do reveal project directory names; that's disclosed in the user docs.)
 8. **Don't touch credentials.** Never read auth/token files (e.g. `~/.config/github-copilot/`).
 
+9. **Respect the shared cutoff.** Ignore anything older than `windowStart(ctx)` (`src/providers/window.ts`). It is the
+   retention boundary, so a source you re-read (truncated log, replayed session) can't re-insert rows that were pruned.
+
 ## Enforcement
 
 `tests/privacy.test.ts` ingests fixtures whose prompt and response fields contain a sentinel string, then dumps **every
