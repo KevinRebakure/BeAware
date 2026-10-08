@@ -45,7 +45,10 @@ flowchart LR
 | `src/db/repositories/*`         | one file per entity; all SQL lives here                     |
 | `src/notify.ts`                 | OS notification command                                     |
 | `src/launchd.ts`                | install/uninstall, plist generation                         |
-| `src/tui/*`                     | App, Dashboard, Settings, AddSpend                          |
+| `src/tui/App.tsx`, `AddSpend.tsx` | screen switching, key handling, add-spend form            |
+| `src/tui/dashboard/`            | `Dashboard` composes small parts: header, today's spend, provider bars, next alert, status rows, banner, warnings, key hints |
+| `src/tui/settings/`             | `Settings` renders; `useSettingsScreen` holds the state and keys; `items.ts` lists rows and formats values |
+| `src/tui/components/`           | shared: `Panel`, `Section`, `ProgressBar`                   |
 
 ## Boundaries
 

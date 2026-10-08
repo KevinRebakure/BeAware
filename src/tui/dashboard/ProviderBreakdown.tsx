@@ -1,7 +1,7 @@
 import { Box, Text } from "ink";
 import { formatCents } from "../../core/money.ts";
 import type { ProviderShare } from "../../providers/breakdown.ts";
-import { ProgressBar } from "./ProgressBar.tsx";
+import { ProgressBar } from "../components/ProgressBar.tsx";
 
 /** Each provider's brand colour, so it stays the same however many providers are listed. */
 const PROVIDER_COLORS: Record<string, string> = {

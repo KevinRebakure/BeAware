@@ -8,8 +8,8 @@ import { summarize } from "../providers/breakdown.ts";
 import { install, restart } from "../launchd.ts";
 import { clearManualSpend, updateSettings } from "../service.ts";
 import { AddSpend } from "./AddSpend.tsx";
-import { Dashboard } from "./Dashboard.tsx";
-import { Settings } from "./Settings.tsx";
+import { Dashboard } from "./dashboard/Dashboard.tsx";
+import { Settings } from "./settings/Settings.tsx";
 
 type Screen = "dashboard" | "add" | "settings";
 
