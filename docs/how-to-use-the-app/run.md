@@ -8,7 +8,8 @@ The daemon runs by itself: starts at login, restarts if it crashes. Nothing to l
 | `beaware status` | daemon running? last sync, today's total |
 | `beaware logs`   | follow the daemon log                    |
 
-Closing the TUI does **not** stop alerts.
+`beaware` takes over the whole terminal (like vim or htop) and puts your screen back when you quit. The layout grows with
+the window up to 100 columns and stays centred, and follows if you resize. Closing the TUI does **not** stop alerts.
 
 ## TUI keys
 

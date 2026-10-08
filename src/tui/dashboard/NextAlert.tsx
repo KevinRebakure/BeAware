@@ -11,7 +11,7 @@ export function NextAlert({ totalCents, intervalCents, enabled }: { totalCents: 
     <Box flexDirection="column">
       <Text dimColor>NEXT ALERT</Text>
       <ProgressBar ratio={(totalCents - base) / intervalCents} color={enabled ? "cyan" : "gray"} />
-      <Box justifyContent="space-between" width={32}>
+      <Box justifyContent="space-between">
         <Text dimColor>{formatCents(base)}</Text>
         <Text dimColor>{formatCents(nextCents)}</Text>
       </Box>

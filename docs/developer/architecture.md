@@ -48,7 +48,7 @@ flowchart LR
 | `src/tui/App.tsx`, `AddSpend.tsx` | screen switching, key handling, add-spend form            |
 | `src/tui/dashboard/`            | `Dashboard` composes small parts: header, today's spend, provider bars, next alert, status rows, banner, warnings, key hints |
 | `src/tui/settings/`             | `Settings` renders; `useSettingsScreen` holds the state and keys; `items.ts` lists rows and formats values |
-| `src/tui/components/`           | shared: `Panel`, `Section`, `ProgressBar`                   |
+| `src/tui/components/`           | shared: `Screen` (centres the content, caps its width, the only reader of terminal size), `Panel` (owns its inner width), `Section`, `ProgressBar` |
 
 ## Boundaries
 

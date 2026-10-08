@@ -67,7 +67,8 @@ if (arg === "--version" || arg === "-v") {
   process.exit(1);
 } else {
   const store = new Store();
-  const app = render(createElement(App, { store }));
+  // The alternate screen takes over the whole terminal and restores it on exit, like vim or htop.
+  const app = render(createElement(App, { store }), { alternateScreen: true });
   await app.waitUntilExit();
   store.close();
 }

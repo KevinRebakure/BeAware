@@ -1,6 +1,9 @@
 import { Text } from "ink";
+import { usePanelInnerWidth } from "./Panel.tsx";
 
-export function ProgressBar({ ratio, width = 32, color = "cyan" }: { ratio: number; width?: number; color?: string }) {
+/** A bar spanning the enclosing panel, `ratio` (0-1) filled. */
+export function ProgressBar({ ratio, color = "cyan" }: { ratio: number; color?: string }) {
+  const width = usePanelInnerWidth();
   const filled = Math.max(0, Math.min(width, Math.round(ratio * width)));
   return (
     <Text>

@@ -8,14 +8,24 @@ import { summarize } from "../providers/breakdown.ts";
 import { install, restart } from "../launchd.ts";
 import { clearManualSpend, updateSettings } from "../service.ts";
 import { AddSpend } from "./AddSpend.tsx";
+import { Screen } from "./components/Screen.tsx";
 import { Dashboard } from "./dashboard/Dashboard.tsx";
 import { Settings } from "./settings/Settings.tsx";
 
-type Screen = "dashboard" | "add" | "settings";
+type ScreenName = "dashboard" | "add" | "settings";
 
+/** Every view is centred and capped by Screen. */
 export function App({ store }: { store: Store }) {
+  return (
+    <Screen>
+      <AppBody store={store} />
+    </Screen>
+  );
+}
+
+function AppBody({ store }: { store: Store }) {
   const { exit } = useApp();
-  const [screen, setScreen] = useState<Screen>("dashboard");
+  const [screen, setScreen] = useState<ScreenName>("dashboard");
   const [, setTick] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const refresh = () => setTick((t) => t + 1);
