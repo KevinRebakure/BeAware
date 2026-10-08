@@ -1,10 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { evaluate, milestoneFloor, type AlertResult } from "./core/alerts.ts";
-import { costMicros, DEFAULT_PRICES, priceFor, validatePrices, type PriceTable } from "./core/pricing.ts";
+import { costMicros, priceFor, validatePrices, type PriceTable } from "./core/pricing.ts";
 import { pricesPath } from "./db/paths.ts";
 import { Store, type Settings } from "./db/store.ts";
-import { syncClaude } from "./ingest/claude.ts";
+import { DEFAULT_PRICES, PROVIDERS, SOURCES } from "./providers/registry.ts";
 
 export type CheckResult = { totalCents: number; alert: AlertResult | null };
 
@@ -63,9 +63,13 @@ export type SyncResult = CheckResult & {
   pricesError: string | null;
 };
 
-export type SyncOptions = { claudeRoot?: string; pricesFile?: string; now?: Date };
+export type SyncOptions = { roots?: Partial<Record<string, string>>; pricesFile?: string; now?: Date };
 
-/** Load prices.json (writing the defaults on first run). Throws a message string-ish Error on bad content. */
+/**
+ * Load prices.json (writing the defaults on first run). A provider that is new to an existing file gets its
+ * default prices added; entries already in the file, including the user's edits, are never touched.
+ * Throws an Error with a user-readable message on bad content.
+ */
 function loadPrices(file: string): PriceTable {
   if (!existsSync(file)) {
     mkdirSync(dirname(file), { recursive: true });
@@ -80,20 +84,27 @@ function loadPrices(file: string): PriceTable {
   }
   const v = validatePrices(parsed);
   if ("error" in v) throw new Error(v.error);
-  return v.table;
+
+  const added = PROVIDERS.filter((p) => !Object.keys(p.defaultPrices).some((m) => m in v.table));
+  if (added.length === 0) return v.table;
+  const merged = { ...v.table, ...Object.assign({}, ...added.map((p) => p.defaultPrices)) };
+  writeFileSync(file, JSON.stringify(merged, null, 2) + "\n");
+  return merged;
 }
 
 /**
- * Pull new Claude Code usage into the store and check alerts. Prices are reloaded when
- * prices.json changes and stored usage is repriced; if that pushes today's total over a
- * milestone the alert fires like any other. The very first sync is quiet: usage that
- * already exists is treated as seen.
+ * Pull new usage from every provider into the store and check alerts. Prices are reloaded when
+ * prices.json changes and token-priced usage is repriced; if that pushes today's total over a
+ * milestone the alert fires like any other. Each provider's very first sync is quiet: usage that
+ * already exists is treated as seen. A provider that fails is skipped (and retried) so it can't
+ * block the others.
  */
 export function createSyncer(store: Store, opts: SyncOptions = {}) {
   const file = opts.pricesFile ?? pricesPath();
   let table: PriceTable = DEFAULT_PRICES;
   let stamp = "";
   let pricesError: string | null = null;
+  const tokenPriced = SOURCES.filter((s) => s.tokenPriced);
 
   return function sync(): SyncResult {
     let current = "";
@@ -112,24 +123,34 @@ export function createSyncer(store: Store, opts: SyncOptions = {}) {
         table = DEFAULT_PRICES;
         pricesError = (e as Error).message;
       }
-      store.repriceClaude((model, usage) => {
-        const p = priceFor(model, table);
-        return p ? costMicros(usage, p) : 0;
-      });
+      for (const s of tokenPriced) {
+        store.repriceSource(s.id, (model, usage) => {
+          const p = priceFor(model, table);
+          return p ? costMicros(usage, p) : 0;
+        });
+      }
     }
 
-    const first = store.isFirstSync();
-    syncClaude(store, { root: opts.claudeRoot, prices: table, now: opts.now });
+    const firstSyncs: string[] = [];
+    for (const p of PROVIDERS) {
+      const first = store.isFirstSync(p.id);
+      try {
+        p.sync({ store, prices: table, now: opts.now, roots: opts.roots });
+        if (first) firstSyncs.push(p.id);
+      } catch (e) {
+        console.error(`${new Date().toISOString()} ${p.id} sync failed: ${(e as Error).message}`);
+      }
+    }
 
     let check: CheckResult;
-    if (first) {
+    if (firstSyncs.length > 0) {
       rebaseline(store);
-      store.markSynced();
+      firstSyncs.forEach((id) => store.markSynced(id));
       check = { totalCents: store.total(), alert: null };
     } else {
       check = checkAlerts(store);
     }
-    const unknownModels = store.claudeModels().filter((m) => !priceFor(m, table));
+    const unknownModels = [...new Set(tokenPriced.flatMap((s) => store.modelsFor(s.id)))].filter((m) => !priceFor(m, table));
     return { ...check, unknownModels, pricesError };
   };
 }

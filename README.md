@@ -1,6 +1,6 @@
 # BeAware
 
-Spending alerts for Claude Code. Runs in the background and notifies you each time today's spend crosses another `$X`
+Spending alerts for Claude Code and GitHub Copilot. Runs in the background and notifies you each time today's spend crosses another `$X`
 milestone.
 
 > macOS only. Requires [Bun](https://bun.sh).
@@ -38,4 +38,5 @@ bun run typecheck
 ## Docs
 
 - [How to use the app](docs/how-to-use-the-app/README.md): install, configure, alerts, costs
+- [Privacy and data security](docs/how-to-use-the-app/privacy-and-data-security.md): what is read, what is stored, no network
 - [Developer](docs/developer/README.md): stack, architecture, flows
