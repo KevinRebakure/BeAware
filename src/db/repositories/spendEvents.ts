@@ -1,0 +1,83 @@
+import type { Database } from "bun:sqlite";
+import type { Usage } from "../../core/pricing.ts";
+
+/** Amounts are stored as integer micro-dollars (1 cent = 10_000) because token costs are fractions of a cent. */
+const MICROS_PER_CENT = 10_000;
+
+type ClaudeRow = Usage & { id: number; model: string; amountMicros: number };
+
+export class SpendEventsRepo {
+  constructor(
+    private db: Database,
+    private clock: () => Date,
+  ) {}
+
+  /** Manual spend, in cents. */
+  addManual(cents: number) {
+    this.db
+      .query("INSERT INTO spend_events (source, amount_micros, created_at) VALUES ('manual', ?, ?)")
+      .run(cents * MICROS_PER_CENT, this.clock().toISOString());
+  }
+
+  /** Delete all manually added spend (any day). Log-derived usage is untouched. */
+  clearManual() {
+    this.db.query("DELETE FROM spend_events WHERE source = 'manual'").run();
+  }
+
+  /** Insert or overwrite one Claude Code response (the last log line for a message wins). */
+  upsertClaude(ev: { key: string; model: string; at: string; usage: Usage }, amountMicros: number) {
+    const u = ev.usage;
+    this.db
+      .query(
+        `INSERT INTO spend_events (source, ext_key, model, input_tokens, output_tokens, cache_read_tokens,
+           cache_5m_tokens, cache_1h_tokens, amount_micros, created_at)
+         VALUES ('claude-code', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(ext_key) DO UPDATE SET model = excluded.model, input_tokens = excluded.input_tokens,
+           output_tokens = excluded.output_tokens, cache_read_tokens = excluded.cache_read_tokens,
+           cache_5m_tokens = excluded.cache_5m_tokens, cache_1h_tokens = excluded.cache_1h_tokens,
+           amount_micros = excluded.amount_micros, created_at = excluded.created_at`,
+      )
+      .run(ev.key, ev.model, u.input, u.output, u.cacheRead, u.cache5m, u.cache1h, amountMicros, ev.at);
+  }
+
+  /** Sum of spend in [start, end), in whole cents (rounded down). */
+  totalCents(start: Date, end: Date): number {
+    const row = this.db
+      .query(
+        `SELECT COALESCE(SUM(amount_micros), 0) AS t FROM spend_events
+         WHERE created_at >= ? AND created_at < ?`,
+      )
+      .get(start.toISOString(), end.toISOString()) as { t: number };
+    return Math.floor(row.t / MICROS_PER_CENT);
+  }
+
+  claudeModels(): string[] {
+    const rows = this.db
+      .query("SELECT DISTINCT model FROM spend_events WHERE source = 'claude-code' ORDER BY model")
+      .all() as { model: string }[];
+    return rows.map((r) => r.model);
+  }
+
+  /** Recompute Claude Code costs from stored tokens. Returns true if any amount changed. */
+  repriceClaude(cost: (model: string, usage: Usage) => number): boolean {
+    const rows = this.db
+      .query(
+        `SELECT id, model, amount_micros AS amountMicros, input_tokens AS input, output_tokens AS output,
+           cache_read_tokens AS cacheRead, cache_5m_tokens AS cache5m, cache_1h_tokens AS cache1h
+         FROM spend_events WHERE source = 'claude-code'`,
+      )
+      .all() as ClaudeRow[];
+    const update = this.db.query("UPDATE spend_events SET amount_micros = ? WHERE id = ?");
+    let changed = false;
+    this.db.transaction(() => {
+      for (const r of rows) {
+        const next = cost(r.model, r);
+        if (next !== r.amountMicros) {
+          update.run(next, r.id);
+          changed = true;
+        }
+      }
+    })();
+    return changed;
+  }
+}

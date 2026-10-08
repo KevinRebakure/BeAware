@@ -1,44 +1,43 @@
-import { Database } from "bun:sqlite";
-import { mkdirSync } from "node:fs";
-import { dirname } from "node:path";
+import type { Database } from "bun:sqlite";
+import type { AlertResult } from "../core/alerts.ts";
 import { dayKey, dayRange } from "../core/day.ts";
 import type { Usage } from "../core/pricing.ts";
-import { dbPath } from "./paths.ts";
+import { openDatabase } from "./config.ts";
+import { AlertStateRepo } from "./repositories/alertState.ts";
+import { HeartbeatRepo, type HeartbeatInput } from "./repositories/heartbeat.ts";
+import { IngestFilesRepo } from "./repositories/ingestFiles.ts";
+import { LastAlertRepo } from "./repositories/lastAlert.ts";
+import { SettingsRepo, type Settings } from "./repositories/settings.ts";
+import { SpendEventsRepo } from "./repositories/spendEvents.ts";
 
-export type Settings = { enabled: boolean; intervalCents: number; dayStartHour: number };
+export { DEFAULT_SETTINGS, type Settings } from "./repositories/settings.ts";
+export type { StoredAlert } from "./repositories/lastAlert.ts";
 
-export const DEFAULT_SETTINGS: Settings = { enabled: true, intervalCents: 2500, dayStartHour: 4 };
-
-/** Amounts are stored as integer micro-dollars (1 cent = 10_000) because token costs are fractions of a cent. */
-const MICROS_PER_CENT = 10_000;
-
-type ClaudeRow = Usage & { id: number; model: string; amountMicros: number };
-
+/**
+ * The single entry point to persistence. It owns the connection and the clock, delegates
+ * each entity to its repository, and holds the few operations that span entities (the
+ * "current day" depends on settings; today's total depends on the day).
+ */
 export class Store {
   private db: Database;
-  /** This Store is the only writer of settings, so reads are served from memory after the first. */
-  private settings: Settings | null = null;
+  private spend: SpendEventsRepo;
+  private settings: SettingsRepo;
+  private alertState: AlertStateRepo;
+  private ingest: IngestFilesRepo;
+  private heartbeat: HeartbeatRepo;
+  private alerts: LastAlertRepo;
 
   constructor(
-    path: string = dbPath(),
+    path?: string,
     private clock: () => Date = () => new Date(),
   ) {
-    if (path !== ":memory:") mkdirSync(dirname(path), { recursive: true });
-    this.db = new Database(path);
-    this.db.run(`CREATE TABLE IF NOT EXISTS spend_events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      source TEXT NOT NULL,
-      ext_key TEXT UNIQUE,
-      model TEXT,
-      input_tokens INTEGER, output_tokens INTEGER, cache_read_tokens INTEGER,
-      cache_5m_tokens INTEGER, cache_1h_tokens INTEGER,
-      amount_micros INTEGER NOT NULL,
-      created_at TEXT NOT NULL)`);
-    this.db.run(`CREATE INDEX IF NOT EXISTS spend_events_at ON spend_events (created_at)`);
-    this.db.run(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`);
-    this.db.run(`CREATE TABLE IF NOT EXISTS alert_state (
-      day TEXT PRIMARY KEY, last_milestone_cents INTEGER NOT NULL)`);
-    this.db.run(`CREATE TABLE IF NOT EXISTS ingest_files (path TEXT PRIMARY KEY, offset INTEGER NOT NULL)`);
+    this.db = openDatabase(path);
+    this.spend = new SpendEventsRepo(this.db, clock);
+    this.settings = new SettingsRepo(this.db);
+    this.alertState = new AlertStateRepo(this.db);
+    this.ingest = new IngestFilesRepo(this.db);
+    this.heartbeat = new HeartbeatRepo(this.db, clock);
+    this.alerts = new LastAlertRepo(this.db, clock);
   }
 
   close() {
@@ -49,146 +48,100 @@ export class Store {
     this.db.transaction(fn)();
   }
 
+  // --- day & totals (span settings + spend) ---
+
   /** The day the clock is in right now, per the current start-hour setting. */
-  currentDay(): string {
+  private currentDay(): string {
     return dayKey(this.clock(), this.getSettings().dayStartHour);
-  }
-
-  /** Manual spend, in cents. */
-  addSpend(cents: number) {
-    this.db
-      .query("INSERT INTO spend_events (source, amount_micros, created_at) VALUES ('manual', ?, ?)")
-      .run(cents * MICROS_PER_CENT, this.clock().toISOString());
-  }
-
-  /** Insert or overwrite one Claude Code response (the last log line for a message wins). */
-  upsertClaude(ev: { key: string; model: string; at: string; usage: Usage }, amountMicros: number) {
-    const u = ev.usage;
-    this.db
-      .query(
-        `INSERT INTO spend_events (source, ext_key, model, input_tokens, output_tokens, cache_read_tokens,
-           cache_5m_tokens, cache_1h_tokens, amount_micros, created_at)
-         VALUES ('claude-code', ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(ext_key) DO UPDATE SET model = excluded.model, input_tokens = excluded.input_tokens,
-           output_tokens = excluded.output_tokens, cache_read_tokens = excluded.cache_read_tokens,
-           cache_5m_tokens = excluded.cache_5m_tokens, cache_1h_tokens = excluded.cache_1h_tokens,
-           amount_micros = excluded.amount_micros, created_at = excluded.created_at`,
-      )
-      .run(ev.key, ev.model, u.input, u.output, u.cacheRead, u.cache5m, u.cache1h, amountMicros, ev.at);
   }
 
   /** Today's total in whole cents (rounded down). */
   total(day = this.currentDay()): number {
     const [start, end] = dayRange(day, this.getSettings().dayStartHour);
-    const row = this.db
-      .query(
-        `SELECT COALESCE(SUM(amount_micros), 0) AS t FROM spend_events
-         WHERE created_at >= ? AND created_at < ?`,
-      )
-      .get(start.toISOString(), end.toISOString()) as { t: number };
-    return Math.floor(row.t / MICROS_PER_CENT);
+    return this.spend.totalCents(start, end);
   }
 
-  /** Delete all manually added spend (any day). Log-derived usage is untouched. */
+  // --- spend events ---
+
+  addSpend(cents: number) {
+    this.spend.addManual(cents);
+  }
+
   clearManual() {
-    this.db.query("DELETE FROM spend_events WHERE source = 'manual'").run();
+    this.spend.clearManual();
+  }
+
+  upsertClaude(ev: { key: string; model: string; at: string; usage: Usage }, amountMicros: number) {
+    this.spend.upsertClaude(ev, amountMicros);
   }
 
   claudeModels(): string[] {
-    const rows = this.db
-      .query("SELECT DISTINCT model FROM spend_events WHERE source = 'claude-code' ORDER BY model")
-      .all() as { model: string }[];
-    return rows.map((r) => r.model);
+    return this.spend.claudeModels();
   }
 
-  /** Recompute Claude Code costs from stored tokens. Returns true if any amount changed. */
   repriceClaude(cost: (model: string, usage: Usage) => number): boolean {
-    const rows = this.db
-      .query(
-        `SELECT id, model, amount_micros AS amountMicros, input_tokens AS input, output_tokens AS output,
-           cache_read_tokens AS cacheRead, cache_5m_tokens AS cache5m, cache_1h_tokens AS cache1h
-         FROM spend_events WHERE source = 'claude-code'`,
-      )
-      .all() as ClaudeRow[];
-    const update = this.db.query("UPDATE spend_events SET amount_micros = ? WHERE id = ?");
-    let changed = false;
-    this.tx(() => {
-      for (const r of rows) {
-        const next = cost(r.model, r);
-        if (next !== r.amountMicros) {
-          update.run(next, r.id);
-          changed = true;
-        }
-      }
-    });
-    return changed;
+    return this.spend.repriceClaude(cost);
   }
 
-  getOffset(path: string): number | null {
-    const row = this.db.query("SELECT offset FROM ingest_files WHERE path = ?").get(path) as { offset: number } | null;
-    return row?.offset ?? null;
-  }
-
-  setOffset(path: string, offset: number) {
-    this.db
-      .query("INSERT INTO ingest_files (path, offset) VALUES (?, ?) ON CONFLICT(path) DO UPDATE SET offset = excluded.offset")
-      .run(path, offset);
-  }
-
-  /** True until the first log sync has completed (that sync is quiet). */
-  isFirstSync(): boolean {
-    return this.getMeta("synced_once") === null;
-  }
-
-  markSynced() {
-    this.setMeta("synced_once", "1");
-  }
-
-  lastAlerted(day = this.currentDay()): number {
-    const row = this.db
-      .query("SELECT last_milestone_cents AS m FROM alert_state WHERE day = ?")
-      .get(day) as { m: number } | null;
-    return row?.m ?? 0;
-  }
-
-  setLastAlerted(cents: number, day = this.currentDay()) {
-    this.db
-      .query(
-        "INSERT INTO alert_state (day, last_milestone_cents) VALUES (?, ?) " +
-          "ON CONFLICT(day) DO UPDATE SET last_milestone_cents = excluded.last_milestone_cents",
-      )
-      .run(day, cents);
-  }
-
-  private getMeta(key: string): string | null {
-    const row = this.db.query("SELECT value FROM settings WHERE key = ?").get(key) as { value: string } | null;
-    return row?.value ?? null;
-  }
-
-  private setMeta(key: string, value: string) {
-    this.db
-      .query("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
-      .run(key, value);
-  }
+  // --- settings & internal flags ---
 
   getSettings(): Settings {
-    return (this.settings ??= this.loadSettings());
-  }
-
-  private loadSettings(): Settings {
-    const rows = this.db.query("SELECT key, value FROM settings").all() as { key: string; value: string }[];
-    const m = Object.fromEntries(rows.map((r) => [r.key, r.value]));
-    return {
-      enabled: m.alert_enabled === undefined ? DEFAULT_SETTINGS.enabled : m.alert_enabled === "1",
-      intervalCents: m.alert_interval_cents ? Number(m.alert_interval_cents) : DEFAULT_SETTINGS.intervalCents,
-      dayStartHour: m.day_start_hour === undefined ? DEFAULT_SETTINGS.dayStartHour : Number(m.day_start_hour),
-    };
+    return this.settings.get();
   }
 
   saveSettings(s: Settings) {
-    this.setMeta("alert_enabled", s.enabled ? "1" : "0");
-    this.setMeta("alert_interval_cents", String(s.intervalCents));
-    this.setMeta("day_start_hour", String(s.dayStartHour));
-    this.settings = { ...s };
+    this.settings.save(s);
+  }
+
+  isFirstSync(): boolean {
+    return this.settings.isFirstSync();
+  }
+
+  markSynced() {
+    this.settings.markSynced();
+  }
+
+  // --- alert baseline ---
+
+  lastAlerted(day = this.currentDay()): number {
+    return this.alertState.get(day);
+  }
+
+  setLastAlerted(cents: number, day = this.currentDay()) {
+    this.alertState.set(day, cents);
+  }
+
+  // --- ingest offsets ---
+
+  getOffset(path: string): number | null {
+    return this.ingest.getOffset(path);
+  }
+
+  setOffset(path: string, offset: number) {
+    this.ingest.setOffset(path, offset);
+  }
+
+  // --- daemon heartbeat ---
+
+  writeHeartbeat(h: HeartbeatInput) {
+    this.heartbeat.write(h);
+  }
+
+  getHeartbeat() {
+    return this.heartbeat.get();
+  }
+
+  // --- last alert ---
+
+  saveLastAlert(a: AlertResult, totalCents: number) {
+    this.alerts.save(a, totalCents);
+  }
+
+  getPendingAlert() {
+    return this.alerts.getPending();
+  }
+
+  dismissLastAlert() {
+    this.alerts.dismiss();
   }
 }
