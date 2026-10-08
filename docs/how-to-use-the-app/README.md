@@ -9,3 +9,6 @@ BeAware watches your AI coding spend in the background and alerts you each time 
 
 **How it works**
 - [Platform support](platform-support.md) · [Supported harnesses](supported-harnesses.md) · [Alerts](alerts.md) · [Cost calculation](cost-calculation.md)
+
+**Trust**
+- [Privacy and data security](privacy-and-data-security.md): what is read, what is stored, what never leaves your Mac

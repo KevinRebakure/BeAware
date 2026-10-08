@@ -5,13 +5,15 @@
 sequenceDiagram
   participant D as daemon tick()
   participant Sy as syncer
-  participant I as ingest
+  participant P as providers (registry)
   participant St as Store
   participant N as notify
   D->>Sy: sync()
-  Sy->>Sy: reload prices.json if changed → reprice
-  Sy->>I: syncClaude (new bytes only)
-  I->>St: upsert events, save file offsets
+  Sy->>Sy: reload prices.json if changed → reprice token-priced sources
+  loop each provider (a failure is logged and skipped)
+    Sy->>P: sync(ctx) (new data only)
+    P->>St: upsertEvent, setCursor
+  end
   Sy->>St: total(), settings, lastAlerted
   Sy-->>D: {total, alert?, warnings}
   alt alert
@@ -57,4 +59,16 @@ flowchart LR
 ```
 
 ## 6. First sync
-Imports last 7 days, sets baseline to current milestone, fires nothing.
+Per provider (`synced_once:<providerId>`): imports the last 7 days, sets the baseline to the current milestone, fires nothing. A provider added later (e.g. Copilot after an update) gets its own quiet first sync, so its history can't cause an alert. Side effect: an alert that would have been raised by *another* provider in that same tick is absorbed into the new baseline.
+
+## 7. Copilot sources
+```mermaid
+flowchart LR
+  subgraph cli["copilot-cli"]
+    DB[("session-store.db<br/>read-only")] -->|"WHERE id > cursor<br/>explicit columns"| E1["upsertEvent<br/>cost = reported nano-AIU"]
+  end
+  subgraph vs["copilot-vscode"]
+    F[("chatSessions/*.jsonl")] -->|"size:mtime changed?"| R["replay patch log"] --> X["extract ids + tokens"] --> E2["upsertEvent<br/>cost = tokens × copilot/model price"]
+  end
+```
+The two sources run independently; one failing doesn't hide the other.

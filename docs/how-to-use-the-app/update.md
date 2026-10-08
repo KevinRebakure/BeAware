@@ -7,4 +7,9 @@ bun run build
 ./dist/beaware install
 ```
 
-`install` is idempotent: it replaces the binary and reloads the daemon. Data is kept; new DB tables are added automatically.
+`install` is idempotent: it replaces the binary and reloads the daemon. Data is kept.
+
+The database is migrated automatically the first time the new version opens it (existing Claude Code history is kept).
+**Run `install` before opening the new dashboard**: an old daemon still running against a migrated database can't read it
+and logs `tick failed` until it's replaced. After a migration you can't go back to an older version without deleting
+`~/.config/beaware/beaware.db`.

@@ -8,7 +8,7 @@
   2. Banner in the TUI, kept until you dismiss it
 - Alerts off → nothing fires, and old milestones aren't replayed when you turn them on
 - Changing settings never triggers an alert
-- First launch imports the last 7 days **quietly**
+- First launch imports the last 7 days **quietly**, and so does the first sync of each newly supported tool (such as Copilot after an update)
 
 ## "Today"
 Runs from the start hour (default 04:00) to the same hour next day, so late-night work stays in one day.
