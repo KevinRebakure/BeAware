@@ -1,11 +1,12 @@
 import { afterEach, expect, test } from "bun:test";
 import { appendFileSync, mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { DEFAULT_PRICES } from "../src/core/pricing.ts";
-import { Store } from "../src/db/store.ts";
-import { parseLine, syncClaude } from "../src/ingest/claude.ts";
-import { addSpend, clearManualSpend, createSyncer } from "../src/service.ts";
-import { cleanupTmpDirs, tmpDir } from "./helpers.ts";
+import { DEFAULT_PRICES } from "../../src/providers/registry.ts";
+import { Store } from "../../src/db/store.ts";
+import { claudeCode } from "../../src/providers/claude-code/index.ts";
+import { parseLine } from "../../src/providers/claude-code/parse.ts";
+import { addSpend, clearManualSpend, createSyncer } from "../../src/service.ts";
+import { cleanupTmpDirs, isolatedRoots, tmpDir } from "../helpers.ts";
 
 afterEach(cleanupTmpDirs);
 
@@ -36,7 +37,8 @@ function setup() {
   const proj = join(root, "projects", "p1");
   mkdirSync(proj, { recursive: true });
   const store = new Store(join(root, "t.db"), () => NOW);
-  return { root, proj, claudeRoot: join(root, "projects"), pricesFile: join(root, "prices.json"), store };
+  const claudeRoot = join(root, "projects");
+  return { root, proj, claudeRoot, roots: isolatedRoots(root, { "claude-code": claudeRoot }), pricesFile: join(root, "prices.json"), store };
 }
 
 test("parseLine ignores non-usage, synthetic and malformed lines", () => {
@@ -54,7 +56,7 @@ test("a response logged once per content block counts once, last usage wins", ()
     join(proj, "a.jsonl"),
     [line({ id: "m1", output: 2 }), line({ id: "m1", output: 1_000_000 }), line({ id: "m1", output: 1_000_000 })].join("\n") + "\n",
   );
-  syncClaude(store, { root: claudeRoot, prices: DEFAULT_PRICES, now: NOW });
+  claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
   expect(store.total()).toBe(2000); // 1M output tokens at $20/MTok = $20.00, counted once
 });
 
@@ -63,7 +65,7 @@ test("the same response in two files (resumed session) counts once", () => {
   const l = line({ id: "m1", output: 1_000_000 }) + "\n";
   writeFileSync(join(proj, "a.jsonl"), l);
   writeFileSync(join(proj, "b.jsonl"), l);
-  syncClaude(store, { root: claudeRoot, prices: DEFAULT_PRICES, now: NOW });
+  claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
   expect(store.total()).toBe(2000);
 });
 
@@ -72,10 +74,10 @@ test("a half-written last line is read once it completes", () => {
   const f = join(proj, "a.jsonl");
   const full = line({ id: "m1", output: 1_000_000 });
   writeFileSync(f, full.slice(0, 40));
-  syncClaude(store, { root: claudeRoot, prices: DEFAULT_PRICES, now: NOW });
+  claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
   expect(store.total()).toBe(0);
   appendFileSync(f, full.slice(40) + "\n");
-  syncClaude(store, { root: claudeRoot, prices: DEFAULT_PRICES, now: NOW });
+  claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
   expect(store.total()).toBe(2000);
 });
 
@@ -83,10 +85,10 @@ test("new lines are appended on later syncs without double counting", () => {
   const { proj, claudeRoot, store } = setup();
   const f = join(proj, "a.jsonl");
   writeFileSync(f, line({ id: "m1", output: 1_000_000 }) + "\n");
-  syncClaude(store, { root: claudeRoot, prices: DEFAULT_PRICES, now: NOW });
+  claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
   appendFileSync(f, line({ id: "m2", req: "req2", output: 500_000 }) + "\n");
-  syncClaude(store, { root: claudeRoot, prices: DEFAULT_PRICES, now: NOW });
-  syncClaude(store, { root: claudeRoot, prices: DEFAULT_PRICES, now: NOW });
+  claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
+  claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
   expect(store.total()).toBe(3000);
 });
 
@@ -94,9 +96,9 @@ test("a file that shrinks is re-read from the start", () => {
   const { proj, claudeRoot, store } = setup();
   const f = join(proj, "a.jsonl");
   writeFileSync(f, line({ id: "m1", output: 1_000_000 }) + "\n" + line({ id: "m2", req: "r2", output: 1 }) + "\n");
-  syncClaude(store, { root: claudeRoot, prices: DEFAULT_PRICES, now: NOW });
+  claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
   writeFileSync(f, line({ id: "m3", req: "r3", output: 500_000 }) + "\n");
-  syncClaude(store, { root: claudeRoot, prices: DEFAULT_PRICES, now: NOW });
+  claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
   expect(store.total()).toBe(3000); // m1 + m3
 });
 
@@ -106,7 +108,7 @@ test("events older than the 7-day window are not imported", () => {
     join(proj, "a.jsonl"),
     [line({ id: "old", at: iso(10, -5), output: 1_000_000 }), line({ id: "new", req: "r2", output: 1_000_000 })].join("\n") + "\n",
   );
-  syncClaude(store, { root: claudeRoot, prices: DEFAULT_PRICES, now: NOW });
+  claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
   expect(store.total()).toBe(2000);
   expect(store.total("2026-09-25")).toBe(0);
 });
@@ -117,8 +119,8 @@ test("files untouched for longer than the window are skipped, and stay skipped",
   writeFileSync(f, line({ id: "old", output: 1_000_000 }) + "\n");
   const old = new Date(NOW.getTime() - 30 * 86_400_000);
   utimesSync(f, old, old);
-  syncClaude(store, { root: claudeRoot, prices: DEFAULT_PRICES, now: NOW });
-  syncClaude(store, { root: claudeRoot, prices: DEFAULT_PRICES, now: NOW });
+  claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
+  claudeCode.sync({ store, prices: DEFAULT_PRICES, now: NOW, roots: { "claude-code": claudeRoot } });
   expect(store.total()).toBe(0);
 });
 
@@ -135,10 +137,10 @@ const withOutputPrice = (price: number) => {
 };
 
 test("first sync is quiet even past a milestone; later crossing alerts", () => {
-  const { proj, claudeRoot, pricesFile, store } = setup();
+  const { proj, roots, pricesFile, store } = setup();
   const f = join(proj, "a.jsonl");
   writeFileSync(f, line({ id: "m1", output: 1_500_000 }) + "\n"); // $30, past the $25 milestone
-  const sync = createSyncer(store, { claudeRoot, pricesFile, now: NOW });
+  const sync = createSyncer(store, { roots, pricesFile, now: NOW });
   const first = sync();
   expect(first.totalCents).toBe(3000);
   expect(first.alert).toBeNull();
@@ -150,9 +152,9 @@ test("first sync is quiet even past a milestone; later crossing alerts", () => {
 });
 
 test("raising a price that crosses a milestone alerts; lowering one does not", () => {
-  const { proj, claudeRoot, pricesFile, store } = setup();
+  const { proj, roots, pricesFile, store } = setup();
   writeFileSync(join(proj, "a.jsonl"), line({ id: "m1", output: 1_000_000 }) + "\n"); // $20 at $20/MTok
-  const sync = createSyncer(store, { claudeRoot, pricesFile, now: NOW });
+  const sync = createSyncer(store, { roots, pricesFile, now: NOW });
   expect(sync().totalCents).toBe(2000);
 
   writeFileSync(pricesFile, withOutputPrice(30)); // $30 total, crosses $25
@@ -169,29 +171,29 @@ test("raising a price that crosses a milestone alerts; lowering one does not", (
 });
 
 test("unknown models are counted as $0 and reported", () => {
-  const { proj, claudeRoot, pricesFile, store } = setup();
+  const { proj, roots, pricesFile, store } = setup();
   writeFileSync(
     join(proj, "a.jsonl"),
     line({ id: "m1", model: "claude-future-9", output: 1_000_000 }) + "\n" + line({ id: "m2", req: "r2", output: 1_000_000 }) + "\n",
   );
-  const r = createSyncer(store, { claudeRoot, pricesFile, now: NOW })();
+  const r = createSyncer(store, { roots, pricesFile, now: NOW })();
   expect(r.unknownModels).toEqual(["claude-future-9"]);
   expect(r.totalCents).toBe(2000);
 });
 
 test("an invalid prices.json falls back to defaults and reports the error", () => {
-  const { proj, claudeRoot, pricesFile, store } = setup();
+  const { proj, roots, pricesFile, store } = setup();
   writeFileSync(join(proj, "a.jsonl"), line({ id: "m1", output: 1_000_000 }) + "\n");
   writeFileSync(pricesFile, "{ nope");
-  const r = createSyncer(store, { claudeRoot, pricesFile, now: NOW })();
+  const r = createSyncer(store, { roots, pricesFile, now: NOW })();
   expect(r.pricesError).toContain("not valid JSON");
   expect(r.totalCents).toBe(2000);
 });
 
 test("clearing manual spend keeps logged usage and re-baselines silently", () => {
-  const { proj, claudeRoot, pricesFile, store } = setup();
+  const { proj, roots, pricesFile, store } = setup();
   writeFileSync(join(proj, "a.jsonl"), line({ id: "m1", output: 1_000_000 }) + "\n"); // $20 real
-  const sync = createSyncer(store, { claudeRoot, pricesFile, now: NOW });
+  const sync = createSyncer(store, { roots, pricesFile, now: NOW });
   sync();
   expect(addSpend(store, 3000).alert?.crossed).toBe(2); // $50 total: crosses $25 and $50
   clearManualSpend(store);

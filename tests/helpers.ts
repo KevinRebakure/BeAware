@@ -14,3 +14,13 @@ export function tmpDir(prefix = "beaware-"): string {
 export function cleanupTmpDirs() {
   dirs.splice(0).forEach((d) => rmSync(d, { recursive: true, force: true }));
 }
+
+/** Roots that point every provider at `dir` (empty unless a test fills it), so tests never read the real machine. */
+export function isolatedRoots(dir: string, overrides: Record<string, string> = {}): Record<string, string> {
+  return {
+    "claude-code": join(dir, "no-claude"),
+    "copilot-cli": join(dir, "no-copilot", "session-store.db"),
+    "copilot-vscode": join(dir, "no-vscode"),
+    ...overrides,
+  };
+}

@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
-import { costMicros, DEFAULT_PRICES, priceFor, validatePrices } from "../src/core/pricing.ts";
+import { costMicros, priceFor, validatePrices } from "../src/core/pricing.ts";
+import { DEFAULT_PRICES } from "../src/providers/registry.ts";
 
 test("matches exact ids and strips a trailing snapshot date", () => {
   expect(priceFor("claude-opus-5-5", DEFAULT_PRICES)).toBe(DEFAULT_PRICES["claude-opus-5-5"]!);
