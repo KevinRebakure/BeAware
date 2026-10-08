@@ -1,6 +1,6 @@
 # Install
 
-**Requires:** macOS, [Bun](https://bun.sh) (build time only).
+**Requires:** macOS (other platforms are [not supported](platform-support.md)), [Bun](https://bun.sh) (build time only).
 
 ```bash
 git clone <repo> && cd BeAware
