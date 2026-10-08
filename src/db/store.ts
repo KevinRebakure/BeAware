@@ -46,8 +46,8 @@ export class Store {
     this.db.close();
   }
 
-  tx(fn: () => void) {
-    this.db.transaction(fn)();
+  tx<T>(fn: () => T): T {
+    return this.db.transaction(fn)();
   }
 
   // --- day & totals (span settings + spend) ---
@@ -99,12 +99,11 @@ export class Store {
     const now = this.clock();
     const hour = this.getSettings().dayStartHour;
     if (!shouldPrune(this.spend.oldestAt(), now, hour)) return 0;
-    let deleted = 0;
-    this.tx(() => {
-      deleted = this.spend.deleteBefore(keepFrom(now, hour));
+    return this.tx(() => {
+      const deleted = this.spend.deleteBefore(keepFrom(now, hour));
       this.alertState.deleteBefore(keepFromDay(now, hour));
+      return deleted;
     });
-    return deleted;
   }
 
   // --- settings & internal flags ---
@@ -139,6 +138,10 @@ export class Store {
 
   getCursor(key: string): string | null {
     return this.cursors.get(key);
+  }
+
+  getCursors(): Map<string, string> {
+    return this.cursors.all();
   }
 
   setCursor(key: string, value: string) {

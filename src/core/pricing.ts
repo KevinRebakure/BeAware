@@ -18,6 +18,12 @@ export function costMicros(u: Usage, p: Prices): number {
   );
 }
 
+/** Cost in micro-dollars of `usage` on `model`, or 0 when the model has no price (it is reported as unpriced). */
+export function tokenCost(usage: Usage, model: string, table: PriceTable): number {
+  const p = priceFor(model, table);
+  return p ? costMicros(usage, p) : 0;
+}
+
 /** Validate parsed JSON as a price table. Returns an error message or null. */
 export function validatePrices(x: unknown): { table: PriceTable } | { error: string } {
   if (typeof x !== "object" || x === null || Array.isArray(x)) return { error: "prices.json must be an object of models" };

@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { join } from "node:path";
-import { startOfDay } from "../src/core/day.ts";
+import { dayKey, startOfDay } from "../src/core/day.ts";
 import { keepFrom, keepFromDay, shouldPrune } from "../src/db/retention.ts";
 import { Store } from "../src/db/store.ts";
 import { createSyncer } from "../src/service.ts";
@@ -40,7 +40,7 @@ function storeWith(days: number[]) {
       d * 1_000_000, // $d, so each day's spend identifies it
     );
   }
-  const dollars = (d: number) => store.breakdown(`2026-10-${String(d).padStart(2, "0")}`).reduce((s, r) => s + r.micros, 0) / 1e6;
+  const dollars = (d: number) => store.breakdown(dayKey(at(d), 4)).reduce((s, r) => s + r.micros, 0) / 1e6;
   return { store, dollars, setNow: (n: Date) => (now = n) };
 }
 

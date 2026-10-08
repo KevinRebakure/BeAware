@@ -48,11 +48,6 @@ export function isLoaded(): boolean {
   return launchctl("print", `${domain()}/${LABEL}`).ok;
 }
 
-/** `bootout` returns before launchd has finished removing the service; wait (up to ~5s) until it's gone. */
-function waitUntilUnloaded() {
-  for (let i = 0; i < 50 && isLoaded(); i++) Bun.sleepSync(100);
-}
-
 /** Restart the loaded agent (kill + start). */
 export function restart(): boolean {
   return launchctl("kickstart", "-k", `${domain()}/${LABEL}`).ok;
@@ -79,11 +74,11 @@ export function install(): string[] {
   writeFileSync(plistPath(), plistXml(dest, logPath(), process.env));
 
   launchctl("bootout", `${domain()}/${LABEL}`); // not loaded yet is fine
-  waitUntilUnloaded();
+  // bootout returns before launchd has finished removing the service, so an immediate bootstrap can fail with EIO.
+  // Retry the bootstrap itself, for up to ~5s.
   let r = launchctl("bootstrap", domain(), plistPath());
-  // Teardown can still be finishing when it stops being listed; bootstrap then fails with EIO. Retry briefly.
-  for (let i = 0; !r.ok && i < 5; i++) {
-    Bun.sleepSync(300);
+  for (let i = 0; !r.ok && i < 20; i++) {
+    Bun.sleepSync(250);
     r = launchctl("bootstrap", domain(), plistPath());
   }
   if (!r.ok) throw new Error(`launchctl bootstrap failed: ${r.out.trim()}`);

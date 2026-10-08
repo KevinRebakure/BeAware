@@ -24,6 +24,8 @@ export type SyncContext = {
 export interface Provider {
   id: string;
   label: string;
+  /** Colour of this provider's bar on the dashboard (a name or hex); a default is chosen when omitted. */
+  color?: string;
   sources: Source[];
   defaultPrices: PriceTable;
   /** Import new usage for all of this provider's sources. */

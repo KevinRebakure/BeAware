@@ -3,8 +3,7 @@
  * nano-AIU, and 1 AIU = 1 credit = 1e9 nano-AIU is inferred from that field's values, not documented.
  * Everything that converts nano-AIU to dollars goes through here, so a correction is a one-line change.
  */
-export const NANO_AIU_PER_USD = 1e11;
-
+const NANO_AIU_PER_USD = 1e11;
 const MICROS_PER_USD = 1_000_000;
 
 export function nanoAiuToMicros(nanoAiu: number): number {

@@ -1,6 +1,6 @@
 import { closeSync, openSync, readSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { costMicros, priceFor, type PriceTable } from "../../core/pricing.ts";
+import { tokenCost, type PriceTable } from "../../core/pricing.ts";
 import type { Store } from "../../db/store.ts";
 import { parseLine } from "./parse.ts";
 
@@ -35,6 +35,7 @@ function readFrom(path: string, offset: number, size: number): Buffer {
 export function syncClaude(store: Store, opts: { root: string; prices: PriceTable; windowStart: number }): number {
   let written = 0;
   store.tx(() => {
+    const cursors = store.getCursors();
     for (const path of listJsonl(opts.root)) {
       let st;
       try {
@@ -42,7 +43,7 @@ export function syncClaude(store: Store, opts: { root: string; prices: PriceTabl
       } catch {
         continue;
       }
-      const saved = store.getCursor(path);
+      const saved = cursors.get(path) ?? null;
       let offset = saved === null ? null : Number(saved);
       if (offset === null && st.mtimeMs < opts.windowStart) {
         store.setCursor(path, String(st.size)); // too old to matter; don't read it later either
@@ -57,8 +58,7 @@ export function syncClaude(store: Store, opts: { root: string; prices: PriceTabl
       for (const line of buf.subarray(0, end + 1).toString("utf8").split("\n")) {
         const ev = parseLine(line);
         if (!ev || new Date(ev.at).getTime() < opts.windowStart) continue;
-        const p = priceFor(ev.model, opts.prices);
-        store.upsertEvent({ ...ev, sourceId: SOURCE_ID, providerId: SOURCE_ID }, p ? costMicros(ev.usage, p) : 0);
+        store.upsertEvent({ ...ev, sourceId: SOURCE_ID, providerId: SOURCE_ID }, tokenCost(ev.usage, ev.model, opts.prices));
         written++;
       }
       store.setCursor(path, String(offset + end + 1));

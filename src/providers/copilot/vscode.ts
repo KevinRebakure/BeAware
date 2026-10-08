@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join } from "node:path";
-import { costMicros, priceFor, type PriceTable } from "../../core/pricing.ts";
+import { tokenCost, type PriceTable } from "../../core/pricing.ts";
 import type { Store } from "../../db/store.ts";
 import { copilotModel } from "./model.ts";
 
@@ -65,14 +65,20 @@ export function extractRequests(state: Json, fallbackSessionId: string): ChatReq
   return out;
 }
 
+/** `<root>/<workspace>/chatSessions/*.jsonl`. Looks only where sessions live, not through all of VS Code's workspace state. */
 function listChatSessions(root: string): string[] {
-  try {
-    return readdirSync(root, { recursive: true, encoding: "utf8" })
-      .filter((p) => /(^|\/)chatSessions\/[^/]+\.jsonl$/.test(p))
-      .map((p) => join(root, p));
-  } catch {
-    return []; // VS Code isn't installed
-  }
+  const names = (dir: string) => {
+    try {
+      return readdirSync(dir);
+    } catch {
+      return []; // not installed, or a workspace without chats
+    }
+  };
+  return names(root).flatMap((ws) =>
+    names(join(root, ws, "chatSessions"))
+      .filter((f) => f.endsWith(".jsonl"))
+      .map((f) => join(root, ws, "chatSessions", f)),
+  );
 }
 
 /**
@@ -86,6 +92,7 @@ export function syncCopilotVscode(
 ): number {
   let written = 0;
   store.tx(() => {
+    const cursors = store.getCursors();
     for (const path of listChatSessions(opts.root)) {
       let st;
       try {
@@ -95,7 +102,7 @@ export function syncCopilotVscode(
       }
       const cursorKey = `${VSCODE_SOURCE_ID}:${path}`;
       const stamp = `${st.size}:${st.mtimeMs}`;
-      const seen = store.getCursor(cursorKey);
+      const seen = cursors.get(cursorKey) ?? null;
       if (seen === stamp) continue;
       if (seen === null && st.mtimeMs < opts.windowStart) {
         store.setCursor(cursorKey, stamp); // too old to matter
@@ -105,10 +112,9 @@ export function syncCopilotVscode(
       for (const r of extractRequests(state, basename(path, ".jsonl"))) {
         if (new Date(r.at).getTime() < opts.windowStart) continue;
         const usage = { input: r.input, output: r.output, cacheRead: 0, cache5m: 0, cache1h: 0 };
-        const p = priceFor(r.model, opts.prices);
         store.upsertEvent(
           { sourceId: VSCODE_SOURCE_ID, providerId: "copilot", key: r.key, model: r.model, at: r.at, usage },
-          p ? costMicros(usage, p) : 0,
+          tokenCost(usage, r.model, opts.prices),
         );
         written++;
       }

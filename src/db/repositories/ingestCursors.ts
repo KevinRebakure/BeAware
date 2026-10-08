@@ -12,6 +12,12 @@ export class IngestCursorsRepo {
     return row?.value ?? null;
   }
 
+  /** Every cursor at once, so an ingester doesn't query once per file. */
+  all(): Map<string, string> {
+    const rows = this.db.query("SELECT key, value FROM ingest_cursors").all() as { key: string; value: string }[];
+    return new Map(rows.map((r) => [r.key, r.value]));
+  }
+
   set(key: string, value: string) {
     this.db
       .query("INSERT INTO ingest_cursors (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")

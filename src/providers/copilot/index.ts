@@ -8,6 +8,7 @@ import { syncCopilotVscode, VSCODE_SOURCE_ID } from "./vscode.ts";
 export const copilot: Provider = {
   id: "copilot",
   label: "GitHub Copilot",
+  color: "#8957e5", // GitHub Copilot purple
   sources: [
     { id: CLI_SOURCE_ID, label: "Copilot CLI", accuracy: "reported", tokenPriced: false },
     { id: VSCODE_SOURCE_ID, label: "VS Code Chat", accuracy: "estimated", tokenPriced: true },

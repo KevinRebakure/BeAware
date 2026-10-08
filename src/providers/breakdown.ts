@@ -1,4 +1,4 @@
-import { MICROS_PER_CENT } from "../db/repositories/spendEvents.ts";
+import { MANUAL, MICROS_PER_CENT } from "../db/repositories/spendEvents.ts";
 import type { BreakdownRow } from "../db/store.ts";
 import { PROVIDERS } from "./registry.ts";
 import type { Accuracy, Provider } from "./types.ts";
@@ -8,53 +8,63 @@ export type Tag = "est." | "reported" | "entered";
 
 export type SourceShare = { label: string; tag: Tag; cents: number };
 /** `sources` lists only sources that have spend today; `tags` is every tag the provider's sources can carry. */
-export type ProviderShare = { id: string; label: string; cents: number; percent: number; sources: SourceShare[]; tags: Tag[] };
+export type ProviderShare = {
+  id: string;
+  label: string;
+  color?: string;
+  cents: number;
+  percent: number;
+  sources: SourceShare[];
+  tags: Tag[];
+};
 
 const TAG: Record<Accuracy, Tag> = { estimated: "est.", reported: "reported" };
-const MANUAL_ID = "manual";
+
+const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
+
+/** Whole-number percentages of `total` that add up to exactly 100 (largest-remainder rounding). All 0 when total is 0. */
+function roundPercents(values: number[], total: number): number[] {
+  if (total <= 0) return values.map(() => 0);
+  const exact = values.map((v) => (v / total) * 100);
+  const percents = exact.map(Math.floor);
+  const byRemainder = exact.map((x, i) => [x - percents[i]!, i] as const).sort((a, b) => b[0] - a[0]);
+  let leftover = 100 - sum(percents);
+  for (const [, i] of byRemainder) if (leftover-- > 0) percents[i]!++;
+  return percents;
+}
 
 /**
  * Group today's per-source spend by provider with each provider's share of the total.
- * Percentages are whole numbers that always add up to 100 (largest-remainder rounding).
  * Every registered provider is listed, even at $0, so a tool with no usage today is still visible; manual
  * spend only appears once there is some.
  */
 export function summarize(rows: BreakdownRow[], providers: Provider[] = PROVIDERS): ProviderShare[] {
-  const total = rows.reduce((sum, r) => sum + r.micros, 0);
+  const microsBySource = new Map<string, number>();
+  for (const r of rows) microsBySource.set(r.sourceId, (microsBySource.get(r.sourceId) ?? 0) + r.micros);
+  const spent = (sourceId: string) => microsBySource.get(sourceId) ?? 0;
 
-  const spent = (match: (r: BreakdownRow) => boolean) => rows.filter(match).reduce((sum, r) => sum + r.micros, 0);
+  const groups = [
+    ...providers.map((p) => ({
+      id: p.id,
+      label: p.label,
+      color: p.color,
+      alwaysShown: true,
+      sources: p.sources.map((s) => ({ label: s.label, tag: TAG[s.accuracy], micros: spent(s.id) })),
+    })),
+    { id: MANUAL, label: "Manual", color: "gray", alwaysShown: false, sources: [{ label: "Manual", tag: "entered" as Tag, micros: spent(MANUAL) }] },
+  ].map((g) => ({ ...g, micros: sum(g.sources.map((s) => s.micros)) }));
 
-  const groups = providers.map((p) => ({
-    id: p.id,
-    label: p.label,
-    tags: [...new Set(p.sources.map((s) => TAG[s.accuracy]))],
-    sources: p.sources.map((s) => ({ label: s.label, tag: TAG[s.accuracy], micros: spent((r) => r.sourceId === s.id) })),
-  }));
-  groups.push({
-    id: MANUAL_ID,
-    label: "Manual",
-    tags: ["entered"],
-    sources: [{ label: "Manual", tag: "entered", micros: spent((r) => r.providerId === MANUAL_ID) }],
-  });
-
-  const shares = groups
-    .map((g) => ({ ...g, sources: g.sources.filter((s) => s.micros > 0) }))
-    .map((g) => ({ ...g, micros: g.sources.reduce((sum, s) => sum + s.micros, 0) }))
-    .filter((g) => g.micros > 0 || g.id !== MANUAL_ID);
-
-  const exact = shares.map((p) => (total > 0 ? (p.micros / total) * 100 : 0));
-  const floors = exact.map(Math.floor);
-  let leftover = total > 0 ? 100 - floors.reduce((a, b) => a + b, 0) : 0;
-  const byRemainder = exact.map((x, i) => [x - floors[i]!, i] as const).sort((a, b) => b[0] - a[0]);
-  for (const [, i] of byRemainder) if (leftover-- > 0) floors[i]!++;
-
+  const shown = groups.filter((g) => g.alwaysShown || g.micros > 0);
+  const percents = roundPercents(shown.map((g) => g.micros), sum(rows.map((r) => r.micros)));
   const cents = (micros: number) => Math.floor(micros / MICROS_PER_CENT);
-  return shares.map((p, i) => ({
-    id: p.id,
-    label: p.label,
-    cents: cents(p.micros),
-    percent: floors[i]!,
-    tags: p.tags,
-    sources: p.sources.map((s) => ({ label: s.label, tag: s.tag, cents: cents(s.micros) })),
+
+  return shown.map((g, i) => ({
+    id: g.id,
+    label: g.label,
+    color: g.color,
+    cents: cents(g.micros),
+    percent: percents[i]!,
+    tags: [...new Set(g.sources.map((s) => s.tag))],
+    sources: g.sources.filter((s) => s.micros > 0).map((s) => ({ label: s.label, tag: s.tag, cents: cents(s.micros) })),
   }));
 }

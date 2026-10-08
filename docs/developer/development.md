@@ -19,7 +19,7 @@ export BEAWARE_DB=/tmp/bx/b.db BEAWARE_LOG=/tmp/bx/d.log
 `tests/` mirrors `src/` (provider tests under `tests/providers/`). Always pass `isolatedRoots(dir)` (from `tests/helpers.ts`) to `createSyncer`/`provider.sync`: without it a test reads your real `~/.claude` and `~/.copilot`. Pure logic in `core/` + injected clock/`Store(":memory:")` keep tests fast. Daemon tested via `tick(store, fakeSync, fakeNotify)`.
 
 ## Adding a provider
-1. Create `src/providers/<id>/` with, as needed: `paths.ts` (where data lives, env override), `parse.ts` or `<source>.ts` (incremental ingesters), `prices.ts` (default prices, if token-priced), and `index.ts` exporting a `Provider` (`id`, `label`, `sources`, `defaultPrices`, `sync(ctx)`)
+1. Create `src/providers/<id>/` with, as needed: `paths.ts` (where data lives, env override), `parse.ts` or `<source>.ts` (incremental ingesters), `prices.ts` (default prices, if token-priced), and `index.ts` exporting a `Provider` (`id`, `label`, optional `color` for its dashboard bar, `sources`, `defaultPrices`, `sync(ctx)`)
 2. Write through `Store` only: `upsertEvent` (stable raw `key`; the source id is prefixed for you), `getCursor`/`setCursor` for progress
 3. Declare each source's accuracy (`estimated` / `reported`) and whether it is `tokenPriced`; token-priced sources are repriced and checked for unknown models automatically
 4. Add one line to `PROVIDERS` in `src/providers/registry.ts`

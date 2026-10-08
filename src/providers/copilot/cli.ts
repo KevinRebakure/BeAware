@@ -45,34 +45,34 @@ export function syncCopilotCli(store: Store, opts: { dbPath: string; windowStart
     store.tx(() => {
       for (;;) {
         const rows = db.query(USAGE_QUERY).all(cursor) as Row[];
-        if (rows.length === 0) break;
         for (const r of rows) {
-          if (new Date(r.created_at).getTime() >= opts.windowStart) {
-            const cacheRead = r.cache_read_tokens ?? 0;
-            const cacheWrite = r.cache_write_tokens ?? 0;
-            store.upsertEvent(
-              {
-                sourceId: CLI_SOURCE_ID,
-                providerId: "copilot",
-                key: `${r.session_id}:${r.id}`,
-                model: copilotModel(r.model),
-                at: new Date(r.created_at).toISOString(),
-                // input_tokens covers the whole prompt; split out cached parts so the columns don't overlap.
-                usage: {
-                  input: Math.max(0, (r.input_tokens ?? 0) - cacheRead - cacheWrite),
-                  output: r.output_tokens ?? 0,
-                  cacheRead,
-                  cache5m: cacheWrite,
-                  cache1h: 0,
-                },
-              },
-              nanoAiuToMicros(r.total_nano_aiu ?? 0),
-            );
-            written++;
-          }
           cursor = r.id;
+          const at = new Date(r.created_at);
+          if (at.getTime() < opts.windowStart) continue;
+          const cacheRead = r.cache_read_tokens ?? 0;
+          const cacheWrite = r.cache_write_tokens ?? 0;
+          store.upsertEvent(
+            {
+              sourceId: CLI_SOURCE_ID,
+              providerId: "copilot",
+              key: `${r.session_id}:${r.id}`,
+              model: copilotModel(r.model),
+              at: at.toISOString(),
+              // input_tokens covers the whole prompt; split out cached parts so the columns don't overlap.
+              usage: {
+                input: Math.max(0, (r.input_tokens ?? 0) - cacheRead - cacheWrite),
+                output: r.output_tokens ?? 0,
+                cacheRead,
+                cache5m: cacheWrite,
+                cache1h: 0,
+              },
+            },
+            nanoAiuToMicros(r.total_nano_aiu ?? 0),
+          );
+          written++;
         }
-        store.setCursor(CURSOR_KEY, String(cursor));
+        if (rows.length > 0) store.setCursor(CURSOR_KEY, String(cursor));
+        if (rows.length < PAGE) break; // a short page is the last one
       }
     });
     return written;

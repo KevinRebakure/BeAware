@@ -4,6 +4,9 @@ import type { Usage } from "../../core/pricing.ts";
 /** Amounts are stored as integer micro-dollars (1 cent = 10_000) because token costs are fractions of a cent. */
 export const MICROS_PER_CENT = 10_000;
 
+/** Both the provider and the source of spend added by hand. */
+export const MANUAL = "manual";
+
 type StoredRow = Usage & { id: number; model: string; amountMicros: number };
 
 /** One response/request from an AI tool. `key` is unique within its source; the stored `ext_key` is `<sourceId>:<key>`. */
@@ -27,13 +30,13 @@ export class SpendEventsRepo {
   /** Manual spend, in cents. */
   addManual(cents: number) {
     this.db
-      .query("INSERT INTO spend_events (source, provider, amount_micros, created_at) VALUES ('manual', 'manual', ?, ?)")
-      .run(cents * MICROS_PER_CENT, this.clock().toISOString());
+      .query("INSERT INTO spend_events (source, provider, amount_micros, created_at) VALUES (?, ?, ?, ?)")
+      .run(MANUAL, MANUAL, cents * MICROS_PER_CENT, this.clock().toISOString());
   }
 
   /** Delete all manually added spend (any day). Log-derived usage is untouched. */
   clearManual() {
-    this.db.query("DELETE FROM spend_events WHERE source = 'manual'").run();
+    this.db.query("DELETE FROM spend_events WHERE source = ?").run(MANUAL);
   }
 
   /** Insert or overwrite one usage event (the last write for a key wins). */

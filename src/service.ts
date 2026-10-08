@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { evaluate, milestoneFloor, type AlertResult } from "./core/alerts.ts";
-import { costMicros, priceFor, validatePrices, type PriceTable } from "./core/pricing.ts";
+import { priceFor, tokenCost, validatePrices, type PriceTable } from "./core/pricing.ts";
 import { pricesPath } from "./db/paths.ts";
 import { Store, type Settings } from "./db/store.ts";
 import { DEFAULT_PRICES, PROVIDERS, SOURCES } from "./providers/registry.ts";
@@ -126,10 +126,7 @@ export function createSyncer(store: Store, opts: SyncOptions = {}) {
         pricesError = (e as Error).message;
       }
       for (const s of tokenPriced) {
-        store.repriceSource(s.id, (model, usage) => {
-          const p = priceFor(model, table);
-          return p ? costMicros(usage, p) : 0;
-        });
+        store.repriceSource(s.id, (model, usage) => tokenCost(usage, model, table));
       }
     }
 

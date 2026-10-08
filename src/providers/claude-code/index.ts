@@ -7,6 +7,7 @@ import { CLAUDE_DEFAULT_PRICES } from "./prices.ts";
 export const claudeCode: Provider = {
   id: "claude-code",
   label: "Claude Code",
+  color: "#d97757", // Claude orange
   sources: [{ id: SOURCE_ID, label: "Claude Code", accuracy: "estimated", tokenPriced: true }],
   defaultPrices: CLAUDE_DEFAULT_PRICES,
   sync(ctx) {

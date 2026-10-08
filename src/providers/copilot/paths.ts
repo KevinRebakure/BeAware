@@ -1,13 +1,9 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-/** Copilot CLI's data directory (COPILOT_HOME relocates it). */
-export function copilotHome(): string {
-  return process.env.COPILOT_HOME || join(homedir(), ".copilot");
-}
-
-export function cliDbPath(home = copilotHome()): string {
-  return join(home, "session-store.db");
+/** Copilot CLI's session database; COPILOT_HOME relocates its data directory. */
+export function cliDbPath(): string {
+  return join(process.env.COPILOT_HOME || join(homedir(), ".copilot"), "session-store.db");
 }
 
 /** VS Code's per-workspace storage; each `<hash>/chatSessions/*.jsonl` is one chat session. */

@@ -3,13 +3,7 @@ import { formatCents } from "../../core/money.ts";
 import type { ProviderShare } from "../../providers/breakdown.ts";
 import { ProgressBar } from "../components/ProgressBar.tsx";
 
-/** Each provider's brand colour, so it stays the same however many providers are listed. */
-const PROVIDER_COLORS: Record<string, string> = {
-  "claude-code": "#d97757", // Claude orange
-  copilot: "#8957e5", // GitHub Copilot purple
-  manual: "gray",
-};
-/** For providers added later without an entry above. */
+/** For providers that don't set a colour of their own. */
 const FALLBACK = ["cyan", "yellow", "green", "blue"];
 
 /**
@@ -20,7 +14,7 @@ export function ProviderBreakdown({ shares }: { shares: ProviderShare[] }) {
   return (
     <Box flexDirection="column">
       {shares.map((p, i) => {
-        const color = PROVIDER_COLORS[p.id] ?? FALLBACK[i % FALLBACK.length];
+        const color = p.color ?? FALLBACK[i % FALLBACK.length];
         const inlineTag = p.tags.length === 1 ? p.tags[0] : null; // multi-source providers tag each source instead
         return (
           <Box key={p.label} flexDirection="column" marginBottom={1}>
