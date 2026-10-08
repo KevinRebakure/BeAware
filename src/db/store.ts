@@ -5,13 +5,14 @@ import type { Usage } from "../core/pricing.ts";
 import { openDatabase } from "./config.ts";
 import { AlertStateRepo } from "./repositories/alertState.ts";
 import { HeartbeatRepo, type HeartbeatInput } from "./repositories/heartbeat.ts";
-import { IngestFilesRepo } from "./repositories/ingestFiles.ts";
+import { IngestCursorsRepo } from "./repositories/ingestCursors.ts";
 import { LastAlertRepo } from "./repositories/lastAlert.ts";
 import { SettingsRepo, type Settings } from "./repositories/settings.ts";
-import { SpendEventsRepo } from "./repositories/spendEvents.ts";
+import { SpendEventsRepo, type BreakdownRow, type UsageEvent } from "./repositories/spendEvents.ts";
 
 export { DEFAULT_SETTINGS, type Settings } from "./repositories/settings.ts";
 export type { StoredAlert } from "./repositories/lastAlert.ts";
+export type { BreakdownRow, UsageEvent } from "./repositories/spendEvents.ts";
 
 /**
  * The single entry point to persistence. It owns the connection and the clock, delegates
@@ -23,7 +24,7 @@ export class Store {
   private spend: SpendEventsRepo;
   private settings: SettingsRepo;
   private alertState: AlertStateRepo;
-  private ingest: IngestFilesRepo;
+  private cursors: IngestCursorsRepo;
   private heartbeat: HeartbeatRepo;
   private alerts: LastAlertRepo;
 
@@ -35,7 +36,7 @@ export class Store {
     this.spend = new SpendEventsRepo(this.db, clock);
     this.settings = new SettingsRepo(this.db);
     this.alertState = new AlertStateRepo(this.db);
-    this.ingest = new IngestFilesRepo(this.db);
+    this.cursors = new IngestCursorsRepo(this.db);
     this.heartbeat = new HeartbeatRepo(this.db, clock);
     this.alerts = new LastAlertRepo(this.db, clock);
   }
@@ -71,16 +72,22 @@ export class Store {
     this.spend.clearManual();
   }
 
-  upsertClaude(ev: { key: string; model: string; at: string; usage: Usage }, amountMicros: number) {
-    this.spend.upsertClaude(ev, amountMicros);
+  upsertEvent(ev: UsageEvent, amountMicros: number) {
+    this.spend.upsertEvent(ev, amountMicros);
   }
 
-  claudeModels(): string[] {
-    return this.spend.claudeModels();
+  modelsFor(sourceId: string): string[] {
+    return this.spend.modelsFor(sourceId);
   }
 
-  repriceClaude(cost: (model: string, usage: Usage) => number): boolean {
-    return this.spend.repriceClaude(cost);
+  repriceSource(sourceId: string, cost: (model: string, usage: Usage) => number): boolean {
+    return this.spend.repriceSource(sourceId, cost);
+  }
+
+  /** Today's spend per provider and source, in micro-dollars (cents would round small sources to zero). */
+  breakdown(day = this.currentDay()): BreakdownRow[] {
+    const [start, end] = dayRange(day, this.getSettings().dayStartHour);
+    return this.spend.breakdown(start, end);
   }
 
   // --- settings & internal flags ---
@@ -93,12 +100,12 @@ export class Store {
     this.settings.save(s);
   }
 
-  isFirstSync(): boolean {
-    return this.settings.isFirstSync();
+  isFirstSync(providerId: string): boolean {
+    return this.settings.isFirstSync(providerId);
   }
 
-  markSynced() {
-    this.settings.markSynced();
+  markSynced(providerId: string) {
+    this.settings.markSynced(providerId);
   }
 
   // --- alert baseline ---
@@ -111,14 +118,14 @@ export class Store {
     this.alertState.set(day, cents);
   }
 
-  // --- ingest offsets ---
+  // --- ingest cursors ---
 
-  getOffset(path: string): number | null {
-    return this.ingest.getOffset(path);
+  getCursor(key: string): string | null {
+    return this.cursors.get(key);
   }
 
-  setOffset(path: string, offset: number) {
-    this.ingest.setOffset(path, offset);
+  setCursor(key: string, value: string) {
+    this.cursors.set(key, value);
   }
 
   // --- daemon heartbeat ---

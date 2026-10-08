@@ -4,7 +4,7 @@ export type Settings = { enabled: boolean; intervalCents: number; dayStartHour: 
 
 export const DEFAULT_SETTINGS: Settings = { enabled: true, intervalCents: 2500, dayStartHour: 4 };
 
-/** The key/value `settings` table: user settings plus internal flags (e.g. `synced_once`). */
+/** The key/value `settings` table: user settings plus internal flags (e.g. `synced_once:<providerId>`). */
 export class SettingsRepo {
   constructor(private db: Database) {}
 
@@ -25,13 +25,13 @@ export class SettingsRepo {
     this.setMeta("day_start_hour", String(s.dayStartHour));
   }
 
-  /** True until the first log sync has completed (that sync is quiet). */
-  isFirstSync(): boolean {
-    return this.getMeta("synced_once") === null;
+  /** True until this provider's first sync has completed (that sync is quiet). */
+  isFirstSync(providerId: string): boolean {
+    return this.getMeta(`synced_once:${providerId}`) === null;
   }
 
-  markSynced() {
-    this.setMeta("synced_once", "1");
+  markSynced(providerId: string) {
+    this.setMeta(`synced_once:${providerId}`, "1");
   }
 
   private getMeta(key: string): string | null {

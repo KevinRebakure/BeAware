@@ -2,9 +2,21 @@ import type { Database } from "bun:sqlite";
 import type { Usage } from "../../core/pricing.ts";
 
 /** Amounts are stored as integer micro-dollars (1 cent = 10_000) because token costs are fractions of a cent. */
-const MICROS_PER_CENT = 10_000;
+export const MICROS_PER_CENT = 10_000;
 
-type ClaudeRow = Usage & { id: number; model: string; amountMicros: number };
+type StoredRow = Usage & { id: number; model: string; amountMicros: number };
+
+/** One response/request from an AI tool. `key` is unique within its source; the stored `ext_key` is `<sourceId>:<key>`. */
+export type UsageEvent = {
+  sourceId: string;
+  providerId: string;
+  key: string;
+  model: string;
+  at: string;
+  usage: Usage;
+};
+
+export type BreakdownRow = { providerId: string; sourceId: string; micros: number };
 
 export class SpendEventsRepo {
   constructor(
@@ -15,7 +27,7 @@ export class SpendEventsRepo {
   /** Manual spend, in cents. */
   addManual(cents: number) {
     this.db
-      .query("INSERT INTO spend_events (source, amount_micros, created_at) VALUES ('manual', ?, ?)")
+      .query("INSERT INTO spend_events (source, provider, amount_micros, created_at) VALUES ('manual', 'manual', ?, ?)")
       .run(cents * MICROS_PER_CENT, this.clock().toISOString());
   }
 
@@ -24,20 +36,20 @@ export class SpendEventsRepo {
     this.db.query("DELETE FROM spend_events WHERE source = 'manual'").run();
   }
 
-  /** Insert or overwrite one Claude Code response (the last log line for a message wins). */
-  upsertClaude(ev: { key: string; model: string; at: string; usage: Usage }, amountMicros: number) {
+  /** Insert or overwrite one usage event (the last write for a key wins). */
+  upsertEvent(ev: UsageEvent, amountMicros: number) {
     const u = ev.usage;
     this.db
       .query(
-        `INSERT INTO spend_events (source, ext_key, model, input_tokens, output_tokens, cache_read_tokens,
+        `INSERT INTO spend_events (source, provider, ext_key, model, input_tokens, output_tokens, cache_read_tokens,
            cache_5m_tokens, cache_1h_tokens, amount_micros, created_at)
-         VALUES ('claude-code', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(ext_key) DO UPDATE SET model = excluded.model, input_tokens = excluded.input_tokens,
            output_tokens = excluded.output_tokens, cache_read_tokens = excluded.cache_read_tokens,
            cache_5m_tokens = excluded.cache_5m_tokens, cache_1h_tokens = excluded.cache_1h_tokens,
            amount_micros = excluded.amount_micros, created_at = excluded.created_at`,
       )
-      .run(ev.key, ev.model, u.input, u.output, u.cacheRead, u.cache5m, u.cache1h, amountMicros, ev.at);
+      .run(ev.sourceId, ev.providerId, `${ev.sourceId}:${ev.key}`, ev.model, u.input, u.output, u.cacheRead, u.cache5m, u.cache1h, amountMicros, ev.at);
   }
 
   /** Sum of spend in [start, end), in whole cents (rounded down). */
@@ -51,22 +63,33 @@ export class SpendEventsRepo {
     return Math.floor(row.t / MICROS_PER_CENT);
   }
 
-  claudeModels(): string[] {
+  /** Spend in [start, end) split by provider and source, for the dashboard. */
+  breakdown(start: Date, end: Date): BreakdownRow[] {
+    return this.db
+      .query(
+        `SELECT provider AS providerId, source AS sourceId, COALESCE(SUM(amount_micros), 0) AS micros
+         FROM spend_events WHERE created_at >= ? AND created_at < ?
+         GROUP BY provider, source ORDER BY provider, source`,
+      )
+      .all(start.toISOString(), end.toISOString()) as BreakdownRow[];
+  }
+
+  modelsFor(sourceId: string): string[] {
     const rows = this.db
-      .query("SELECT DISTINCT model FROM spend_events WHERE source = 'claude-code' ORDER BY model")
-      .all() as { model: string }[];
+      .query("SELECT DISTINCT model FROM spend_events WHERE source = ? ORDER BY model")
+      .all(sourceId) as { model: string }[];
     return rows.map((r) => r.model);
   }
 
-  /** Recompute Claude Code costs from stored tokens. Returns true if any amount changed. */
-  repriceClaude(cost: (model: string, usage: Usage) => number): boolean {
+  /** Recompute one source's costs from stored tokens. Returns true if any amount changed. */
+  repriceSource(sourceId: string, cost: (model: string, usage: Usage) => number): boolean {
     const rows = this.db
       .query(
         `SELECT id, model, amount_micros AS amountMicros, input_tokens AS input, output_tokens AS output,
            cache_read_tokens AS cacheRead, cache_5m_tokens AS cache5m, cache_1h_tokens AS cache1h
-         FROM spend_events WHERE source = 'claude-code'`,
+         FROM spend_events WHERE source = ?`,
       )
-      .all() as ClaudeRow[];
+      .all(sourceId) as StoredRow[];
     const update = this.db.query("UPDATE spend_events SET amount_micros = ? WHERE id = ?");
     let changed = false;
     this.db.transaction(() => {
