@@ -63,6 +63,17 @@ export class SpendEventsRepo {
     return Math.floor(row.t / MICROS_PER_CENT);
   }
 
+  /** When the oldest stored event happened, or null if there are none. */
+  oldestAt(): Date | null {
+    const row = this.db.query("SELECT MIN(created_at) AS at FROM spend_events").get() as { at: string | null };
+    return row.at ? new Date(row.at) : null;
+  }
+
+  /** Delete every event before `cutoff`, manual ones included. Returns how many were removed. */
+  deleteBefore(cutoff: Date): number {
+    return this.db.query("DELETE FROM spend_events WHERE created_at < ?").run(cutoff.toISOString()).changes;
+  }
+
   /** Spend in [start, end) split by provider and source, for the dashboard. */
   breakdown(start: Date, end: Date): BreakdownRow[] {
     return this.db

@@ -61,6 +61,8 @@ export type SyncResult = CheckResult & {
   unknownModels: string[];
   /** Set when prices.json is unreadable or invalid; built-in defaults are used meanwhile. */
   pricesError: string | null;
+  /** Events deleted by retention on this sync (0 almost always). */
+  pruned: number;
 };
 
 export type SyncOptions = { roots?: Partial<Record<string, string>>; pricesFile?: string; now?: Date };
@@ -142,6 +144,8 @@ export function createSyncer(store: Store, opts: SyncOptions = {}) {
       }
     }
 
+    const pruned = store.prune(); // after ingestion, so the cutoff and the data agree; today's total is unaffected
+
     let check: CheckResult;
     if (firstSyncs.length > 0) {
       rebaseline(store);
@@ -151,6 +155,6 @@ export function createSyncer(store: Store, opts: SyncOptions = {}) {
       check = checkAlerts(store);
     }
     const unknownModels = [...new Set(tokenPriced.flatMap((s) => store.modelsFor(s.id)))].filter((m) => !priceFor(m, table));
-    return { ...check, unknownModels, pricesError };
+    return { ...check, unknownModels, pricesError, pruned };
   };
 }

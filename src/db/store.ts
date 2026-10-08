@@ -3,6 +3,7 @@ import type { AlertResult } from "../core/alerts.ts";
 import { dayKey, dayRange } from "../core/day.ts";
 import type { Usage } from "../core/pricing.ts";
 import { openDatabase } from "./config.ts";
+import { keepFrom, keepFromDay, shouldPrune } from "./retention.ts";
 import { AlertStateRepo } from "./repositories/alertState.ts";
 import { HeartbeatRepo, type HeartbeatInput } from "./repositories/heartbeat.ts";
 import { IngestCursorsRepo } from "./repositories/ingestCursors.ts";
@@ -88,6 +89,22 @@ export class Store {
   breakdown(day = this.currentDay()): BreakdownRow[] {
     const [start, end] = dayRange(day, this.getSettings().dayStartHour);
     return this.spend.breakdown(start, end);
+  }
+
+  /**
+   * Retention: once the data spans PRUNE_AT_DAYS app days, delete everything before the last KEEP_DAYS
+   * (events and per-day alert state). Cheap to call every tick. Returns the number of events deleted.
+   */
+  prune(): number {
+    const now = this.clock();
+    const hour = this.getSettings().dayStartHour;
+    if (!shouldPrune(this.spend.oldestAt(), now, hour)) return 0;
+    let deleted = 0;
+    this.tx(() => {
+      deleted = this.spend.deleteBefore(keepFrom(now, hour));
+      this.alertState.deleteBefore(keepFromDay(now, hour));
+    });
+    return deleted;
   }
 
   // --- settings & internal flags ---

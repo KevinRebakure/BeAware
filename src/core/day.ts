@@ -14,6 +14,12 @@ export function dayRange(key: string, startHour: number): [Date, Date] {
   return [new Date(y, m - 1, d, startHour), new Date(y, m - 1, d + 1, startHour)];
 }
 
+/** Start of the day `daysAgo` days before the day `at` falls in (0 = today's start). */
+export function startOfDay(at: Date, startHour: number, daysAgo = 0): Date {
+  const [start] = dayRange(dayKey(at, startHour), startHour);
+  return new Date(start.getFullYear(), start.getMonth(), start.getDate() - daysAgo, startHour);
+}
+
 /** Whole hour 0-23, or null. */
 export function parseHour(input: string): number | null {
   const m = input.trim().match(/^(\d{1,2})(?::00)?$/);

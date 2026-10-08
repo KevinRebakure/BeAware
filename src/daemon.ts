@@ -1,6 +1,7 @@
 import { existsSync, statSync, truncateSync } from "node:fs";
 import type { AlertResult } from "./core/alerts.ts";
 import { logPath } from "./db/paths.ts";
+import { KEEP_DAYS } from "./db/retention.ts";
 import { Store } from "./db/store.ts";
 import { notifyAlert } from "./notify.ts";
 import { createSyncer, type SyncResult } from "./service.ts";
@@ -58,6 +59,7 @@ export async function runDaemon(store: Store) {
     try {
       const r = tick(store, sync);
       if (r.alert) log(`alert: ${r.alert.crossed} milestone(s), today ${r.totalCents}c`);
+      if (r.pruned > 0) log(`pruned ${r.pruned} events older than the last ${KEEP_DAYS} days`);
     } catch (e) {
       log(`tick failed: ${(e as Error).stack ?? e}`);
     }

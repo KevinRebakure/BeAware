@@ -17,7 +17,6 @@ export type SyncContext = {
   store: Store;
   prices: PriceTable;
   now?: Date;
-  windowDays?: number;
   /** Test/override hook: where to read data from, keyed by provider id (or source id where a provider has several locations). */
   roots?: Partial<Record<string, string>>;
 };

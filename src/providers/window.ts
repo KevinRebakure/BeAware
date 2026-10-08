@@ -1,8 +1,10 @@
+import { keepFrom } from "../db/retention.ts";
 import type { SyncContext } from "./types.ts";
 
-const DEFAULT_WINDOW_DAYS = 7;
-
-/** Epoch ms before which usage is ignored on first sight (older history can't affect today's total). */
+/**
+ * Epoch ms before which usage is ignored. It is the same boundary retention prunes at, so ingestion can never
+ * bring back a row that was deleted (e.g. when a log is truncated or a chat session is replayed).
+ */
 export function windowStart(ctx: SyncContext): number {
-  return (ctx.now ?? new Date()).getTime() - (ctx.windowDays ?? DEFAULT_WINDOW_DAYS) * 86_400_000;
+  return keepFrom(ctx.now ?? new Date(), ctx.store.getSettings().dayStartHour).getTime();
 }

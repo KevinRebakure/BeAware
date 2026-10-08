@@ -40,12 +40,11 @@ export function Dashboard({ totalCents, breakdown, lastAlertedCents, settings, b
           <Text dimColor>TODAY · est.</Text>
           <Text bold>{formatCents(totalCents)}</Text>
         </Box>
-        {breakdown.length > 0 && (
-          <Box marginTop={1} flexDirection="column">
-            <ProviderBreakdown shares={breakdown} />
-          </Box>
-        )}
         <Box marginTop={1} flexDirection="column">
+          <ProviderBreakdown shares={breakdown} />
+        </Box>
+        <Box flexDirection="column">
+          <Text dimColor>NEXT ALERT</Text>
           <ProgressBar ratio={ratio} color={enabled ? "cyan" : "gray"} />
           <Box justifyContent="space-between" width={32}>
             <Text dimColor>{formatCents(base)}</Text>

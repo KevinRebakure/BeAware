@@ -19,4 +19,9 @@ export class AlertStateRepo {
       )
       .run(day, cents);
   }
+
+  /** Forget days before `day` (a "YYYY-MM-DD" key; keys sort chronologically). */
+  deleteBefore(day: string) {
+    this.db.query("DELETE FROM alert_state WHERE day < ?").run(day);
+  }
 }
