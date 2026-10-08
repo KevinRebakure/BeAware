@@ -13,6 +13,8 @@ import { App } from "./tui/App.tsx";
 
 const arg = process.argv[2];
 
+const HOME_AND_ERASE = "\x1b[H\x1b[J"; // cursor to top-left, erase to the end of the screen
+
 const HELP = `BeAware v${VERSION} — spending alerts for AI coding agents
 
 Usage: beaware [command]
@@ -69,6 +71,13 @@ if (arg === "--version" || arg === "-v") {
   const store = new Store();
   // The alternate screen takes over the whole terminal and restores it on exit, like vim or htop.
   const app = render(createElement(App, { store }), { alternateScreen: true });
+  // Ink wipes the screen only when the window gets narrower; otherwise it erases "the previous frame" relative to the
+  // cursor. Terminals that reflow text on resize move rows out from under that, leaving stale rows above the new
+  // frame. So on any resize, clear from the top-left and let the next render repaint everything.
+  process.stdout.on("resize", () => {
+    process.stdout.write(HOME_AND_ERASE);
+    app.clear();
+  });
   await app.waitUntilExit();
   store.close();
 }
