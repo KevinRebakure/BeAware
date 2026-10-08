@@ -4,6 +4,7 @@ import { formatCents } from "../core/money.ts";
 import type { Store } from "../db/store.ts";
 import { pricesPath } from "../db/paths.ts";
 import { isAlive } from "../db/repositories/heartbeat.ts";
+import { summarize } from "../providers/breakdown.ts";
 import { install, restart } from "../launchd.ts";
 import { clearManualSpend, updateSettings } from "../service.ts";
 import { AddSpend } from "./AddSpend.tsx";
@@ -86,6 +87,7 @@ export function App({ store }: { store: Store }) {
   return (
     <Dashboard
       totalCents={store.total()}
+      breakdown={summarize(store.breakdown())}
       lastAlertedCents={store.lastAlerted()}
       settings={store.getSettings()}
       banner={pending}

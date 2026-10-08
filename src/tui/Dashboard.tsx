@@ -5,10 +5,13 @@ import type { Settings } from "../db/store.ts";
 import type { StoredAlert } from "../db/store.ts";
 import { formatAgo } from "../core/ago.ts";
 import { VERSION } from "../version.ts";
+import type { ProviderShare } from "../providers/breakdown.ts";
 import { ProgressBar } from "./components/ProgressBar.tsx";
+import { ProviderBreakdown } from "./components/ProviderBreakdown.tsx";
 
 type Props = {
   totalCents: number;
+  breakdown: ProviderShare[];
   lastAlertedCents: number;
   settings: Settings;
   banner: StoredAlert | null;
@@ -19,7 +22,7 @@ type Props = {
   daemon: { alive: boolean; lastSync: Date | null };
 };
 
-export function Dashboard({ totalCents, lastAlertedCents, settings, banner, notice, unknownModels, pricesError, pricesFile, daemon }: Props) {
+export function Dashboard({ totalCents, breakdown, lastAlertedCents, settings, banner, notice, unknownModels, pricesError, pricesFile, daemon }: Props) {
   const { intervalCents, enabled } = settings;
   const base = milestoneFloor(totalCents, intervalCents);
   const nextCents = base + intervalCents;
@@ -37,6 +40,11 @@ export function Dashboard({ totalCents, lastAlertedCents, settings, banner, noti
           <Text dimColor>TODAY · est.</Text>
           <Text bold>{formatCents(totalCents)}</Text>
         </Box>
+        {breakdown.length > 0 && (
+          <Box marginTop={1} flexDirection="column">
+            <ProviderBreakdown shares={breakdown} />
+          </Box>
+        )}
         <Box marginTop={1} flexDirection="column">
           <ProgressBar ratio={ratio} color={enabled ? "cyan" : "gray"} />
           <Box justifyContent="space-between" width={32}>

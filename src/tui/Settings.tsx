@@ -107,7 +107,7 @@ export function Settings({ settings, onChange, onResetManual, onBack }: Props) {
       </Box>
       {error && <Text color="red">{error}</Text>}
       {note && <Text color="yellow">{note}</Text>}
-      {mode === "confirm" && <Text color="yellow">{"\n"}Delete all manually added spend? Claude Code usage is kept. y/n</Text>}
+      {mode === "confirm" && <Text color="yellow">{"\n"}Delete all manually added spend? Usage read from your tools is kept. y/n</Text>}
       <Text dimColor>
         {"\n"}
         {mode === "edit" ? "enter save esc cancel" : "↑/↓ move enter/space change esc back"}
