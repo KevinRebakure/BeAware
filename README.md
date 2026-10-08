@@ -3,16 +3,27 @@
 Local-first spending alerts for AI coding agents. v0.1 does one thing: alert you each time today's spend crosses another
 `$X` milestone. Spending is entered by hand for now; agent integrations come later.
 
-## Run
+## Install (macOS, runs in the background)
 
 ```bash
 bun install
-bun run dev        # launch the TUI
-bun test           # unit tests
-bun run typecheck
+bun run build              # -> dist/beaware (single self-contained binary)
+./dist/beaware install     # copies to ~/.local/bin/beaware and registers a LaunchAgent
 ```
 
-`beaware --help` and `--version` are the only CLI flags. Everything else is configured in the TUI.
+The daemon (`beaware daemon`) starts at login, restarts if it crashes, syncs Claude Code usage every 10 seconds and sends
+the OS notifications. Run `beaware` in any terminal to open the dashboard and change settings; changes reach the daemon
+within ~10s. After changing the code, run `bun run build && ./dist/beaware install` again (idempotent).
+Make sure `~/.local/bin` is on your `PATH`.
+
+| Command             | What it does                                         |
+|---------------------|------------------------------------------------------|
+| `beaware`           | open the TUI                                         |
+| `beaware status`    | daemon running? last sync, today's total             |
+| `beaware logs`      | follow `~/Library/Logs/beaware/daemon.log`           |
+| `beaware uninstall` | stop the daemon and remove the LaunchAgent (data kept) |
+
+Docs: [docs/](docs/README.md). Development: `bun run dev` (TUI only, no daemon), `bun test`, `bun run typecheck`.
 
 ## TUI keys
 
@@ -21,18 +32,20 @@ bun run typecheck
 | `a` | add simulated spend                                                          |
 | `s` | settings (enable alerts, alert interval, day start hour, reset manual spend) |
 | `r` | refresh                                                                      |
+| `d` | restart the daemon                                                           |
+| `i` | install the daemon (compiled binary only)                                    |
 | `q` | quit                                                                         |
 
 Crossing several milestones in one go (e.g. $23 + $55 → $78) shows **one** combined alert.
 
-Each alert also sends an OS notification (with a sound on macOS) while the TUI is open. macOS uses the built-in
+Each alert is sent by the daemon as an OS notification (with a sound on macOS) and also shown as a banner in the TUI until you dismiss it. macOS uses the built-in
 `osascript`, so notifications appear as coming from "Script Editor"; if none show up, allow it under System Settings →
 Notifications → Script Editor. Linux needs `notify-send` (libnotify). Elsewhere, or if sending fails, only the in-TUI
 banner is shown. Notifications follow the "Alerts" setting.
 
 ## Claude Code usage
 
-While the TUI is open, BeAware reads `~/.claude/projects/**/*.jsonl` (or `$CLAUDE_CONFIG_DIR/projects`) every 10
+The daemon reads `~/.claude/projects/**/*.jsonl` (or `$CLAUDE_CONFIG_DIR/projects`) every 10
 seconds. That covers all projects and subagents. The logs hold token counts, not dollars, so cost is **estimated at API
 rates** and the total is labeled "est.".
 
@@ -57,5 +70,5 @@ integer cents.
 ## Limitations
 
 Claude Code only (no other agents yet), estimated cost rather than your actual bill, no fast-mode pricing, daily period
-only (configurable start hour), alerts and OS notifications only while the TUI is open (no background process), prices
+only (configurable start hour), macOS only for the background service, prices
 edited in the file rather than the TUI, no budget.
