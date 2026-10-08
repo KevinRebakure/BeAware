@@ -29,7 +29,7 @@ erDiagram
     INTEGER cache_5m_tokens
     INTEGER cache_1h_tokens
     INTEGER amount_micros
-    TEXT created_at "ISO time, indexed"
+    TEXT created_at "ISO time, indexed (also with provider)"
   }
   settings {
     TEXT key PK

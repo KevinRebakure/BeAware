@@ -11,15 +11,22 @@ sequenceDiagram
   D->>Sy: sync()
   Sy->>Sy: reload prices.json if changed → reprice token-priced sources
   loop each provider (a failure is logged and skipped)
-    Sy->>P: sync(ctx) (new data only)
+    Sy->>P: sync(ctx) (new data only, nothing before keepFrom)
     P->>St: upsertEvent, setCursor
   end
-  Sy->>St: prune() (retention: oldest days past 7 → keep last 3)
-  Sy->>St: total(), settings, lastAlerted
-  Sy-->>D: {total, alert?, warnings}
+  Sy->>St: prune() (data spans 7 days → keep the last 3)
+  alt a provider's first sync
+    Sy->>St: rebaseline, markSynced (quiet, no alert)
+  else
+    Sy->>St: total(), settings, lastAlerted → checkAlerts
+  end
+  Sy-->>D: {total, alert?, warnings, pruned}
   alt alert
     D->>St: saveLastAlert
     D->>N: OS notification
+  end
+  opt pruned > 0
+    D->>D: log "pruned N events older than the last 3 days"
   end
   D->>St: writeHeartbeat
 ```
@@ -39,12 +46,16 @@ High-water mark advances even when disabled → no replay.
 ## 3. TUI
 ```mermaid
 flowchart LR
-  T["every 2s"] --> R["read Store"]
-  R --> UI["total · heartbeat · pending alert"]
+  subgraph screen["Screen: alternate screen, top-left, at most 56 columns"]
+    T["every 2s"] --> R["read Store"]
+    R --> UI["total · per-provider breakdown (summarize)<br/>heartbeat · pending alert"]
+  end
   K["keys"] --> W["Store writes:<br/>settings, manual spend,<br/>dismiss alert"]
   W -. "picked up next daemon tick" .-> D["daemon"]
+  Z["terminal resized, or startup"] --> C["clear from top-left, repaint"]
+  C --> screen
 ```
-Alive = heartbeat younger than 30s.
+Alive = heartbeat younger than 30s. `Screen` is the only reader of terminal size; it caps the width and `Panel` derives bar widths from it. Startup also repaints from the top-left because entering the alternate screen leaves the cursor where the shell prompt was.
 
 ## 4. Settings change
 TUI → `updateSettings` → `Store.saveSettings`. If interval or day-start changed → rebaseline (no alert). Daemon reads settings fresh each tick (no cache).
@@ -56,6 +67,8 @@ flowchart LR
   B --> C["write plist"]
   C --> D["launchctl bootout (ignore)"]
   D --> E["launchctl bootstrap gui/UID"]
+  E -- "fails with EIO while the old service is still being removed" --> G["retry every 250ms, up to ~5s"]
+  G --> E
   E --> F["daemon starts; first sync is quiet"]
 ```
 
@@ -75,10 +88,12 @@ One boundary, `keepFrom(now, dayStartHour)` in `src/db/retention.ts`, is shared 
 ```mermaid
 flowchart LR
   subgraph cli["copilot-cli"]
-    DB[("session-store.db<br/>read-only")] -->|"WHERE id > cursor<br/>explicit columns"| E1["upsertEvent<br/>cost = reported nano-AIU"]
+    DB[("session-store.db<br/>read-only")] -->|"WHERE id > cursor<br/>explicit columns"| K1{"before keepFrom?"}
+    K1 -- no --> E1["upsertEvent<br/>cost = reported nano-AIU"]
+    K1 -- yes --> S1["skip (cursor still advances)"]
   end
   subgraph vs["copilot-vscode"]
-    F[("chatSessions/*.jsonl")] -->|"size:mtime changed?"| R["replay patch log"] --> X["extract ids + tokens"] --> E2["upsertEvent<br/>cost = tokens × copilot/model price"]
+    F[("workspace/chatSessions/*.jsonl")] -->|"size:mtime changed?"| R["replay patch log"] --> X["extract ids + tokens<br/>(requests before keepFrom ignored)"] --> E2["upsertEvent<br/>cost = tokens × copilot/model price"]
   end
 ```
 The two sources run independently; one failing doesn't hide the other.

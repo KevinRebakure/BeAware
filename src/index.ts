@@ -71,13 +71,17 @@ if (arg === "--version" || arg === "-v") {
   const store = new Store();
   // The alternate screen takes over the whole terminal and restores it on exit, like vim or htop.
   const app = render(createElement(App, { store }), { alternateScreen: true });
-  // Ink wipes the screen only when the window gets narrower; otherwise it erases "the previous frame" relative to the
-  // cursor. Terminals that reflow text on resize move rows out from under that, leaving stale rows above the new
-  // frame. So on any resize, clear from the top-left and let the next render repaint everything.
-  process.stdout.on("resize", () => {
+  // Ink draws relative to the cursor and only wipes the screen when the window gets narrower. But entering the alternate
+  // screen leaves the cursor where the shell prompt was, so the UI would start part-way down the screen, and terminals
+  // that reflow text on resize leave stale rows above the new frame. So repaint from the top-left corner at startup
+  // and on every resize.
+  const repaint = () => {
     process.stdout.write(HOME_AND_ERASE);
     app.clear();
-  });
+    app.rerender(createElement(App, { store })); // a new element, so React renders it again
+  };
+  repaint();
+  process.stdout.on("resize", repaint);
   await app.waitUntilExit();
   store.close();
 }

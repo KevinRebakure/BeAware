@@ -9,7 +9,7 @@ The daemon runs by itself: starts at login, restarts if it crashes. Nothing to l
 | `beaware logs`   | follow the daemon log                    |
 
 `beaware` takes over the whole terminal (like vim or htop) and puts your screen back when you quit. The layout grows with
-the window up to 100 columns and stays centred, and follows if you resize. Closing the TUI does **not** stop alerts.
+the window but never gets wider than 56 columns, and is pinned to the top-left corner. It follows if you resize. Closing the TUI does **not** stop alerts.
 
 ## TUI keys
 

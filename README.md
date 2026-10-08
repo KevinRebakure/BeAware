@@ -24,12 +24,15 @@ Only usage written to local files on your Mac is counted; nothing is fetched fro
 | GitHub Copilot | Visual Studio, Xcode, Neovim             | ❌         | –          | not read                                                             |
 | GitHub Copilot | github.com chat, cloud coding agent      | ❌         | –          | runs remotely                                                        |
 | GitHub Copilot | Code completions, next-edit suggestions  | ❌         | –          | don't consume credits                                                |
-| Others         | Codex, Cursor, Gemini CLI…               | ❌         | –          | not implemented yet                                                  |
+| Others         | OpenCode, Codex, Cursor, Gemini CLI…     | ❌         | –          | not implemented yet                                                  |
 | Platform       | Linux, Windows                           | ❌         | –          | macOS only                                                           |
 
 **est.** is tokens × your price table; **reported** is the cost the tool recorded itself. Details:
 [supported harnesses](docs/how-to-use-the-app/supported-harnesses.md)
 and [cost calculation](docs/how-to-use-the-app/cost-calculation.md).
+
+BeAware only shows today, so it keeps just the last 3 days of usage: once 7 days have built up, the oldest 4 are deleted
+([data retention](docs/how-to-use-the-app/privacy-and-data-security.md#how-long-data-is-kept)).
 
 ## Quick start
 

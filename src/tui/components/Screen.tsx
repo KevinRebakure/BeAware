@@ -1,8 +1,8 @@
 import { Box, useWindowSize } from "ink";
 import { createContext, useContext, type ReactNode } from "react";
 
-/** The UI grows with the terminal up to this many columns, then stays centred. */
-const MAX_WIDTH = 100;
+/** The UI never gets wider than this, however big the terminal is; it shrinks to fit a narrower one. */
+const MAX_WIDTH = 56;
 
 const ContentWidth = createContext(MAX_WIDTH);
 
@@ -10,18 +10,15 @@ const ContentWidth = createContext(MAX_WIDTH);
 export const useContentWidth = () => useContext(ContentWidth);
 
 /**
- * Root of every screen: a content column that fills the terminal up to MAX_WIDTH, centred horizontally. This is the
- * only place that reads the terminal size. Height is left to the content so it stays pinned to the top instead of
- * jumping when a banner or warning appears.
+ * Root of every screen: a content column as wide as the terminal up to MAX_WIDTH, pinned to the top-left corner. This
+ * is the only place that reads the terminal size.
  */
 export function Screen({ children }: { children: ReactNode }) {
   const width = Math.min(useWindowSize().columns, MAX_WIDTH);
   return (
     <ContentWidth.Provider value={width}>
-      <Box width="100%" justifyContent="center">
-        <Box flexDirection="column" width={width}>
-          {children}
-        </Box>
+      <Box flexDirection="column" width={width}>
+        {children}
       </Box>
     </ContentWidth.Provider>
   );

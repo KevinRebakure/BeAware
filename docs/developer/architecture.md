@@ -7,21 +7,24 @@ flowchart LR
     subgraph bin["beaware binary"]
         CLI["index.ts<br/>subcommands"]
         D["daemon.ts"]
-        T["tui/ (Ink)"]
+        T["tui/ (Ink)<br/>full-screen, top-left"]
         L["launchd.ts"]
     end
     CLI --> D & T & L
     L -- " plist + launchctl " --> LD[(launchd)]
     LD -- " runs at login / KeepAlive " --> D
-    D --> S["service.ts<br/>sync + alerts"]
+    D --> S["service.ts<br/>sync + alerts + prune"]
     S --> R["providers/registry.ts"]
     R --> PC["providers/claude-code/"]
     R --> PG["providers/copilot/<br/>cli.ts · vscode.ts"]
     S --> C["core/<br/>alerts, pricing, day, money"]
     PC -- " reads " --> J[("~/.claude/projects<br/>*.jsonl")]
     PG -- " reads (read-only) " --> K[("~/.copilot session-store.db<br/>VS Code chatSessions/*.jsonl")]
+    T --> BR["providers/breakdown.ts<br/>per-provider shares"]
     S & T --> ST["db/store.ts"]
-    ST --> DB[("beaware.db<br/>SQLite WAL")]
+    ST --> RET["db/retention.ts<br/>keep the last 3 days"]
+    PC & PG -. " ignore data before keepFrom " .-> RET
+    ST --> DB[("beaware.db<br/>SQLite WAL<br/>migrated on open")]
     D --> N["notify.ts"] --> OS["macOS<br/>notification"]
     S -- " reads " --> P[("prices.json")]
 ```
@@ -48,7 +51,7 @@ flowchart LR
 | `src/tui/App.tsx`, `AddSpend.tsx` | screen switching, key handling, add-spend form            |
 | `src/tui/dashboard/`            | `Dashboard` composes small parts: header, today's spend, provider bars, next alert, status rows, banner, warnings, key hints |
 | `src/tui/settings/`             | `Settings` renders; `useSettingsScreen` holds the state and keys; `items.ts` lists rows and formats values |
-| `src/tui/components/`           | shared: `Screen` (centres the content, caps its width, the only reader of terminal size), `Panel` (owns its inner width), `Section`, `ProgressBar` |
+| `src/tui/components/`           | shared: `Screen` (pins the content top-left, caps its width, the only reader of terminal size), `Panel` (owns its inner width), `Section`, `ProgressBar` |
 
 ## Boundaries
 
