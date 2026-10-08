@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 
-/** Idempotent: safe to run on every start, and adds new tables to an existing database. */
-export function createSchema(db: Database) {
+/** The original schema. Idempotent, so databases created before migrations existed pass through unchanged. */
+export function baseline(db: Database) {
   db.run(`CREATE TABLE IF NOT EXISTS spend_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source TEXT NOT NULL,
