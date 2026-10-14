@@ -9,14 +9,26 @@ import { createSyncer, type SyncResult } from "./service.ts";
 const TICK_MS = 10_000;
 const MAX_LOG_BYTES = 5 * 1024 * 1024;
 
-/** True when a process with this pid exists (signal 0 only checks). */
+/** Command line of a process, or null when it can't be read. */
+function commandOf(pid: number): string | null {
+  const p = Bun.spawnSync(["ps", "-p", String(pid), "-o", "command="], { stdout: "pipe", stderr: "pipe" });
+  const out = p.stdout.toString().trim();
+  return p.exitCode === 0 && out ? out : null;
+}
+
+/**
+ * True when this pid is a running daemon. Pids get reused by the OS, so a live pid alone is not enough:
+ * its command line must match ours (the daemon is always started the same way).
+ */
 function pidRunning(pid: number): boolean {
   try {
     process.kill(pid, 0);
-    return true;
   } catch (e) {
-    return (e as NodeJS.ErrnoException).code === "EPERM";
+    if ((e as NodeJS.ErrnoException).code !== "EPERM") return false;
   }
+  const theirs = commandOf(pid);
+  const ours = commandOf(process.pid);
+  return theirs === null || ours === null || theirs === ours;
 }
 
 /** One daemon iteration: sync usage, record + notify any alert, write the heartbeat. */
